@@ -1,0 +1,32 @@
+# h054_spot_bot — Bitget bot for quant_lab H054 (+ funding arbitrage on idle cash).
+# Everything below was decided in quant_lab (see README). Change with care.
+
+mode: paper              # paper = no real order (virtual portfolio)  |  live = real orders on Bitget
+paper_capital: 1000      # USDT of the virtual portfolio in paper mode
+
+strategy:                # H054 = quant_lab core rule "dual_trend_vt" + 10% no-trade band, BTC+ETH 50/50
+  assets: [BTC/USDT, ETH/USDT]
+  timeframe: 4h
+  sma_days: 200
+  horizons_days: [30, 90, 180]
+  vol_target: 0.40
+  vol_lookback_days: 30
+  band: 0.10
+
+idle_arb:                # long spot + short perp on the cash H054 does not use (quant_lab: accepted)
+  enabled: true
+  hedge_share: 0.5       # hedged notional = 50% of idle cash; the same amount sits in the perp account as margin
+  leverage: 1
+
+safety:
+  quant_lab_registry: https://raw.githubusercontent.com/evsayar33-oss/quant_lab/main/decisions/registry.json
+  hypothesis: H054
+  max_registry_age_days: 10     # older -> treated as not approved
+  min_trade_usdt: 6             # smaller orders are skipped (Bitget minimums ~1-8 USDT)
+  max_turnover_per_run: 0.60    # never trade more than 60% of equity in one run (fat-finger guard)
+  min_equity_usdt: 100          # live mode stops below this
+
+costs:                   # used by the paper simulation only
+  spot_fee: 0.001
+  perp_fee: 0.0006
+  slippage: 0.0005

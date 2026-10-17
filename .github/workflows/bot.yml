@@ -1,0 +1,37 @@
+name: h054-bot
+on:
+  schedule:
+    - cron: '11 0,4,8,12,16,20 * * *'
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: h054-bot
+  cancel-in-progress: false
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install -r requirements.txt
+      - run: python tests/test_bot.py
+      - name: Run bot
+        env:
+          BITGET_API_KEY: ${{ secrets.BITGET_API_KEY }}
+          BITGET_API_SECRET: ${{ secrets.BITGET_API_SECRET }}
+          BITGET_PASSPHRASE: ${{ secrets.BITGET_PASSPHRASE }}
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          CHAT_ID: ${{ secrets.CHAT_ID }}
+          LIVE_TRADING: ${{ vars.LIVE_TRADING }}
+        run: python -m bot.main
+      - name: Commit state
+        run: |
+          git config user.name "h054-bot"; git config user.email "bot@users.noreply.github.com"
+          git add state logs || true
+          git diff --cached --quiet && exit 0
+          git commit -m "bot run $(date -u +%FT%H:%M)"
+          for i in 1 2 3 4 5; do git pull --rebase -X ours -q && git push -q && exit 0; sleep $((i*5)); done; exit 1
