@@ -1,12 +1,12 @@
 {
  "summary_day": "2026-10-25",
- "last_bar": "2026-10-25 16:00:00",
+ "last_bar": "2026-10-26 00:00:00",
  "approved": true,
  "why": "H054 ACCEPT (8 g\u00fcn \u00f6nce do\u011fruland\u0131)",
- "equity": 977.05,
- "updated_at": "2026-10-25T22:29:23+00:00",
+ "equity": 961.54,
+ "updated_at": "2026-10-26T04:34:22+00:00",
  "targets": {
   "BTC/USDT": 0.5,
-  "ETH/USDT": 0.4831505415960044
+  "ETH/USDT": 0.4832356723279776
  }
 }
