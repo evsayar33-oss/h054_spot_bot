@@ -1,10 +1,10 @@
 {
  "summary_day": "2026-10-31",
- "last_bar": "2026-11-07 00:00:00",
+ "last_bar": "2026-11-07 08:00:00",
  "approved": false,
  "why": "H054 karar\u0131 DEGRADED",
- "equity": 978.22,
- "updated_at": "2026-11-07T05:48:58+00:00",
+ "equity": 978.21,
+ "updated_at": "2026-11-07T14:51:35+00:00",
  "targets": {
   "BTC/USDT": 0.0,
   "ETH/USDT": 0.0
