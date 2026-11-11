@@ -1,10 +1,10 @@
 {
  "summary_day": "2026-11-10",
- "last_bar": "2026-11-10 16:00:00",
+ "last_bar": "2026-11-11 00:00:00",
  "approved": false,
  "why": "quant_lab kayd\u0131 okunamad\u0131: HTTP Error 404: Not Found",
- "equity": 978.69,
- "updated_at": "2026-11-10T21:46:33+00:00",
+ "equity": 978.65,
+ "updated_at": "2026-11-11T05:58:10+00:00",
  "targets": {
   "BTC/USDT": 0.0,
   "ETH/USDT": 0.0
