@@ -54,11 +54,11 @@ def snapshot(now_ms):
     ex=ccxt.bitget({"enableRateLimit":True,"timeout":20000})
     frames={}
     quotes={}
-    anchor=int(pd.Timestamp("2025-11-01",tz="UTC").timestamp()*1000)
+    anchor=int(pd.Timestamp("2025-01-01",tz="UTC").timestamp()*1000)
     for sym in SYMBOLS:
         cursor=anchor
         rows=[]
-        for _ in range(100):
+        for _ in range(300):
             batch=ex.fetch_ohlcv(sym,"4h",since=cursor,limit=200)
             if not batch:break
             next_rows=[r for r in batch if int(r[0])>=cursor]
@@ -70,7 +70,9 @@ def snapshot(now_ms):
         df=pd.DataFrame(rows,columns=["ts","o","h","l","c","v"])
         df=df.loc[df.ts+BAR<=now_ms].copy()
         if len(df)<1201 or df.ts.duplicated().any() or np.any(np.diff(df.ts.to_numpy())!=BAR):
-            raise ValueError("BAD_BAR_CONTINUITY:"+sym)
+            gaps=np.diff(df.ts.to_numpy())
+            bad=gaps[gaps!=BAR]
+            raise ValueError(f"BAD_BAR_CONTINUITY:{sym}:rows={len(df)}:first={int(df.ts.iloc[0]) if len(df) else 0}:last={int(df.ts.iloc[-1]) if len(df) else 0}:gaps={bad[:4].tolist()}")
         if not np.isfinite(df[["o","h","l","c","v"]].to_numpy(float)).all() or (df.c<=0).any():
             raise ValueError("BAD_PRICES:"+sym)
         df.index=pd.to_datetime(df.pop("ts"),unit="ms",utc=True)
