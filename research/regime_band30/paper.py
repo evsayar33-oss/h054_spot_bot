@@ -12,14 +12,17 @@ import pandas as pd
 SYMBOLS=("BTC/USDT","ETH/USDT","SOL/USDT","BNB/USDT")
 BAR=4*3600000
 SCHEMA="h054.regime_band30.bitget.paper.v1"
+SIGNAL_VERSION="regime_relative30_v2"
 COST=0.0015
 INITIAL=10000.0
 
 
 def weights(closes: pd.DataFrame) -> dict:
-    """Port of quant_superlab H116 top2_btc_regime + H117 wide_band(0.30).
+    """H116 top2_btc_regime with a CORRECTED relative 30% turnover band.
 
-    Warm up with complete history so the band state is path dependent.
+    WARNING: this is a NEW, unvalidated candidate, NOT equivalent to H117
+    regime_band30 (30 percentage points absolute), which cannot enter when
+    max per-asset target is 20 percentage points. Warm-up is path-dependent.
     """
     if len(closes)<1201 or closes.isna().any().any() or (closes<=0).any().any():
         raise ValueError("INSUFFICIENT_OR_GAPPED_WARMUP")
@@ -35,7 +38,9 @@ def weights(closes: pd.DataFrame) -> dict:
     raw=(0.40/vol).clip(upper=1).where(chosen,0).fillna(0)/2
     raw=raw.where(regime,0.)
     raw=raw.clip(lower=0,upper=1)
-    # H116 banded first applies its original 10% band; H117 then applies 30%.
+    # H116 applies its original 10 percentage-point band. The historic H117
+    # 30 percentage-point OUTER band makes all <=20% targets permanently zero.
+    # Corrected v2 instead thresholds changes relative to target/position.
     def band(data,threshold):
         current=np.zeros(len(SYMBOLS))
         out=[]
@@ -44,7 +49,15 @@ def weights(closes: pd.DataFrame) -> dict:
             current=np.where(change,row,current)
             out.append(current.copy())
         return pd.DataFrame(out,index=data.index,columns=data.columns)
-    target=band(band(raw,0.10),0.30).iloc[-1].to_dict()
+    prior=band(raw,0.10)
+    current=np.zeros(len(SYMBOLS))
+    output=[]
+    for proposed in prior.to_numpy(dtype=float):
+        threshold=0.30*np.maximum(np.abs(proposed),np.abs(current))
+        change=(np.abs(proposed-current)>threshold)|((proposed==0)&(current!=0))
+        current=np.where(change,proposed,current)
+        output.append(current.copy())
+    target=pd.DataFrame(output,index=prior.index,columns=prior.columns).iloc[-1].to_dict()
     if any(not math.isfinite(v) or v<0 for v in target.values()) or sum(target.values())>1.000001:
         raise ValueError("INVALID_TARGET")
     return {k:float(v) for k,v in target.items()}
@@ -175,6 +188,8 @@ def seed(now):
 def tick(state,now,ob):
     if state["schema"]!=SCHEMA:raise ValueError("STATE_SCHEMA")
     if state["finalized"]:return False
+    if state.get("signal_version") not in (None,SIGNAL_VERSION):
+        raise ValueError("SIGNAL_VERSION_MISMATCH")
     candle=ob["candle_ms"]
     if candle+BAR>now:raise ValueError("UNCLOSED_CANDLE")
     if state["last_candle_ms"] is not None and candle<=state["last_candle_ms"]:
@@ -203,7 +218,7 @@ def tick(state,now,ob):
             trades.append({"asset":s,"side":"buy","usdt":spend,"px":ask})
     if cash< -1e-6:raise ValueError("NEGATIVE_CASH")
     nav=cash+sum(qty[s]*quotes[s]["bid"] for s in SYMBOLS)
-    state.update(cash=cash,qty=qty,last_candle_ms=candle)
+    state.update(cash=cash,qty=qty,last_candle_ms=candle,signal_version=SIGNAL_VERSION)
     state["trades"].extend({"observed_ms":now,**t} for t in trades)
     state["ticks"].append({"observed_ms":now,"candle_ms":candle,
                             "nav":nav,"weights":target,"quotes":quotes,"trades":len(trades)})
@@ -224,6 +239,10 @@ def run(mode,state_path,out,now=None,snapshot_fn=snapshot):
     else:raise ValueError("INVALID_MODE")
     if state["schema"]!=SCHEMA:raise ValueError("STATE_SCHEMA")
     if state["finalized"]:return state
+    if state.get("signal_version") not in (None,SIGNAL_VERSION):
+        raise ValueError("SIGNAL_VERSION_MISMATCH")
+    if state.get("signal_version") is None and state["trades"]:
+        raise ValueError("LEGACY_LEDGER_HAS_TRADES_DO_NOT_MIGRATE")
     try:
         tick(state,now,snapshot_fn(now))
     except Exception as exc:
@@ -233,7 +252,8 @@ def run(mode,state_path,out,now=None,snapshot_fn=snapshot):
     state_path.write_text(json.dumps(state,indent=2,sort_keys=True,allow_nan=False)+"\n")
     out.mkdir(parents=True,exist_ok=True)
     nav=state["ticks"][-1]["nav"] if state["ticks"] else INITIAL
-    summary={"schema":SCHEMA,"venue":"Bitget spot","paper_only":True,
+    summary={"schema":SCHEMA,"signal_version":state.get("signal_version","legacy_v1"),
+             "historical_returns_not_transferable":True,"venue":"Bitget spot","paper_only":True,
              "started_ms":state["start_ms"],"ends_ms":state["end_ms"],
              "nav":nav,"return_pct":100*(nav/INITIAL-1),
              "observations":len(state["ticks"]),"trades":len(state["trades"]),
