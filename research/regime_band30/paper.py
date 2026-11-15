@@ -61,6 +61,42 @@ def _fetch_retry(fn, *args, **kwargs):
             time.sleep(min(45, 3 * 2**attempt) + random.uniform(0, 1))
 
 
+def _repair_missing_candles(ex, sym, df):
+    """Refetch only missing 4h timestamps from Bitget; never interpolate or substitute."""
+    if df.empty or df.ts.duplicated().any():
+        raise ValueError("DUPLICATE_OR_EMPTY_CANDLES:" + sym)
+    missing = []
+    timestamps = df.ts.to_numpy(dtype="int64")
+    for left, right in zip(timestamps[:-1], timestamps[1:]):
+        if right <= left or (right-left) % BAR:
+            raise ValueError("UNALIGNED_CANDLE_GRID:" + sym)
+        missing.extend(range(int(left)+BAR,int(right),BAR))
+        if len(missing)>40:
+            raise ValueError("TOO_MANY_MISSING_CANDLES:" + sym)
+    if not missing:
+        return df
+    recovered={}
+    for ts in missing:
+        # Look around each missing candle. Bitget may exclude since boundary.
+        for params in ({"useHistoryEndpoint":True}, {}):
+            batch=_fetch_retry(ex.fetch_ohlcv,sym,"4h",
+                               since=ts-3*BAR,limit=12,params=params)
+            for row in batch:
+                if int(row[0])==ts:
+                    recovered[ts]=row
+            if ts in recovered:
+                break
+            time.sleep(0.5)
+    if set(recovered)!=set(missing):
+        missing_left=sorted(set(missing)-set(recovered))
+        raise ValueError(f"UNRECOVERABLE_BITGET_GAPS:{sym}:count={len(missing_left)}:first={missing_left[:4]}")
+    repaired=pd.concat([df,pd.DataFrame(list(recovered.values()),columns=df.columns)],ignore_index=True)
+    repaired=repaired.sort_values("ts").reset_index(drop=True)
+    if repaired.ts.duplicated().any() or np.any(np.diff(repaired.ts.to_numpy(dtype="int64"))!=BAR):
+        raise ValueError("REPAIR_FAILED_VALIDATION:"+sym)
+    return repaired
+
+
 def snapshot(now_ms):
     import ccxt
     ex=ccxt.bitget({"enableRateLimit":True,"timeout":20000})
@@ -82,10 +118,9 @@ def snapshot(now_ms):
         else:raise ValueError("SOURCE_PAGE_LIMIT:"+sym)
         df=pd.DataFrame(rows,columns=["ts","o","h","l","c","v"])
         df=df.loc[df.ts+BAR<=now_ms].copy()
-        if len(df)<1201 or df.ts.duplicated().any() or np.any(np.diff(df.ts.to_numpy())!=BAR):
-            gaps=np.diff(df.ts.to_numpy())
-            bad=gaps[gaps!=BAR]
-            raise ValueError(f"BAD_BAR_CONTINUITY:{sym}:rows={len(df)}:first={int(df.ts.iloc[0]) if len(df) else 0}:last={int(df.ts.iloc[-1]) if len(df) else 0}:gaps={bad[:4].tolist()}")
+        if len(df)<1201:
+            raise ValueError(f"INSUFFICIENT_WARMUP:{sym}:{len(df)}")
+        df=_repair_missing_candles(ex,sym,df)
         if not np.isfinite(df[["o","h","l","c","v"]].to_numpy(float)).all() or (df.c<=0).any():
             raise ValueError("BAD_PRICES:"+sym)
         df.index=pd.to_datetime(df.pop("ts"),unit="ms",utc=True)
@@ -152,8 +187,10 @@ def tick(state,now,ob):
 def run(mode,state_path,out,now=None,snapshot_fn=snapshot):
     now=int(time.time()*1000) if now is None else now
     if mode=="start":
-        if state_path.exists():raise ValueError("ALREADY_STARTED")
-        state=seed(now)
+        if state_path.exists():
+            state=json.loads(state_path.read_text())  # idempotent start; never reset the ledger
+        else:
+            state=seed(now)
     elif mode=="tick":
         if not state_path.exists():return None
         state=json.loads(state_path.read_text())
@@ -173,7 +210,9 @@ def run(mode,state_path,out,now=None,snapshot_fn=snapshot):
              "started_ms":state["start_ms"],"ends_ms":state["end_ms"],
              "nav":nav,"return_pct":100*(nav/INITIAL-1),
              "observations":len(state["ticks"]),"trades":len(state["trades"]),
-             "outages":len(state["outages"]),"finalized":state["finalized"]}
+             "outages":len(state["outages"]),"finalized":state["finalized"],
+             "healthy":bool(state["ticks"]) and state["ticks"][-1]["observed_ms"]==now,
+             "last_error":state["outages"][-1] if state["outages"] and (not state["ticks"] or state["outages"][-1]["observed_ms"]>=state["ticks"][-1]["observed_ms"]) else None}
     (out/"summary.json").write_text(json.dumps(summary,indent=2)+"\n")
     print(json.dumps(summary))
     return state

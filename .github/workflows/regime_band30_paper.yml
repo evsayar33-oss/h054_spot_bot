@@ -78,3 +78,16 @@ jobs:
           path: results/regime_band30/report/
           retention-days: 90
           if-no-files-found: warn
+      - name: Reject green status when no valid market observation
+        run: |
+          python - <<'PY'
+          import json,sys
+          from pathlib import Path
+          p=Path("results/regime_band30/report/summary.json")
+          if not p.exists():
+              sys.exit("NO_PAPER_SUMMARY")
+          d=json.loads(p.read_text())
+          if not d.get("healthy"):
+              sys.exit("PAPER_UNHEALTHY: " + str(d.get("last_error")))
+          print("PAPER_HEALTHY: observations",d["observations"],"trades",d["trades"])
+          PY
