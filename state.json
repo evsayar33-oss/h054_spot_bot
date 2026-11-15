@@ -8,6 +8,11 @@
       "error": "ValueError",
       "message": "BAD_BAR_CONTINUITY:BTC/USDT",
       "observed_ms": 1794771247202
+    },
+    {
+      "error": "DDoSProtection",
+      "message": "bitget {\"code\":\"429\",\"msg\":\"Too Many Requests\",\"requestTime\":1794771585891,\"data\":null}",
+      "observed_ms": 1794771582028
     }
   ],
   "qty": {
