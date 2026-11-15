@@ -97,11 +97,42 @@ def _repair_missing_candles(ex, sym, df):
     return repaired
 
 
+def _fresh_orderbook_quotes(ex, symbols, clock_ms=None):
+    """Fresh spot order-book top levels, gathered together AFTER the historical scan.
+
+    Reject missing, crossed, stale, or delayed books. Never substitute candle close
+    for executable bid/ask. A book lacking an exchange timestamp is conservatively
+    rejected rather than mislabelled as fresh.
+    """
+    clock_ms=clock_ms or (lambda: int(time.time()*1000))
+    result={}
+    for sym in symbols:
+        started=clock_ms()
+        book=_fetch_retry(ex.fetch_order_book,sym,limit=5)
+        received=clock_ms()
+        bids,asks=book.get("bids") or [],book.get("asks") or []
+        stamp=book.get("timestamp")
+        if not bids or not asks or stamp is None:
+            raise ValueError("MISSING_ORDERBOOK_QUOTE:"+sym)
+        bid,ask=float(bids[0][0]),float(asks[0][0])
+        stamp=int(stamp)
+        if (not math.isfinite(bid) or not math.isfinite(ask)
+            or bid<=0 or ask<bid or ask/bid>1.05
+            or received<started or received-started>60000
+            or received-stamp>120000 or stamp>received+30000):
+            raise ValueError("STALE_ORDERBOOK_QUOTE:"+sym)
+        result[sym]={"bid":bid,"ask":ask,"ts":stamp,"received_ms":received,
+                     "source":"bitget_spot_orderbook"}
+    # No artificial synchronous valuation from quotes taken minutes apart.
+    if max(v["received_ms"] for v in result.values())-min(v["received_ms"] for v in result.values())>120000:
+        raise ValueError("DESYNCHRONIZED_ORDERBOOKS")
+    return result
+
+
 def snapshot(now_ms):
     import ccxt
     ex=ccxt.bitget({"enableRateLimit":True,"timeout":20000})
     frames={}
-    quotes={}
     anchor=int(pd.Timestamp("2025-01-01",tz="UTC").timestamp()*1000)
     for sym in SYMBOLS:
         cursor=anchor
@@ -125,18 +156,14 @@ def snapshot(now_ms):
             raise ValueError("BAD_PRICES:"+sym)
         df.index=pd.to_datetime(df.pop("ts"),unit="ms",utc=True)
         frames[sym]=df
-        ticker=_fetch_retry(ex.fetch_ticker,sym)
-        bid,ask,stamp=ticker.get("bid"),ticker.get("ask"),ticker.get("timestamp")
-        if (not bid or not ask or not stamp or not 0<float(bid)<=float(ask)
-                or now_ms-int(stamp)>600000 or int(stamp)>now_ms+60000):
-            raise ValueError("STALE_QUOTE:"+sym)
-        quotes[sym]={"bid":float(bid),"ask":float(ask),"ts":int(stamp)}
     if any(not frames[s].index.equals(frames[SYMBOLS[0]].index) for s in SYMBOLS):
         raise ValueError("MISALIGNED_CANDLES")
     last=int(frames[SYMBOLS[0]].index[-1].timestamp()*1000)
     if now_ms-(last+BAR)>BAR*2:raise ValueError("STALE_LAST_CANDLE")
     closes=pd.DataFrame({s:frames[s].c for s in SYMBOLS})
-    return {"candle_ms":last,"quotes":quotes,"weights":weights(closes)}
+    target=weights(closes)
+    quotes=_fresh_orderbook_quotes(ex,SYMBOLS)
+    return {"candle_ms":last,"quotes":quotes,"weights":target}
 
 
 def seed(now):
