@@ -51,6 +51,64 @@ def test_paper():
     paper.accrue_funding(pf, px, {c: 0.0001 for c in coins}, 8)
     assert paper.equity(pf, px) > eq     # short earns positive funding
 
+
+def test_mom2_requires_two_of_three_positive_horizons():
+    idx = pd.date_range("2020-01-01", periods=1600, freq="4h")
+    v = np.full(len(idx), 100.0)
+    v[-181], v[-91], v[-31], v[-1] = 170.0, 140.0, 160.0, 150.0
+    close = pd.Series(v, index=idx)
+    base = dict(cfg["strategy"], min_positive_horizons=1)
+    strong = dict(base, min_positive_horizons=2)
+    assert signal.exposure(close, base, 365.25 * 6).iloc[-1] > 0
+    assert signal.exposure(close, strong, 365.25 * 6).iloc[-1] == 0
+    old = dict(base)
+    old.pop("min_positive_horizons")
+    np.testing.assert_allclose(signal.exposure(close, old, 365.25 * 6),
+                               signal.exposure(close, base, 365.25 * 6))
+
+
+def test_momentum_threshold_validation():
+    idx = pd.date_range("2020-01-01", periods=1600, freq="4h")
+    close = pd.Series(np.linspace(100, 200, len(idx)), index=idx)
+    for bad in (0, 4, 1.5, True):
+        try:
+            signal.exposure(close, dict(cfg["strategy"], min_positive_horizons=bad), 365.25 * 6)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError(f"Invalid min_positive_horizons accepted: {bad}")
+
+
 if __name__ == "__main__":
     for n, f in list(globals().items()):
         if n.startswith("test_"): f(); print("ok", n)
+
+
+def test_mom2_requires_two_of_three_positive_horizons():
+    # At the final bar only the 90d horizon is positive; SMA200 remains risk-on.
+    idx = pd.date_range("2020-01-01", periods=1600, freq="4h")
+    v = np.full(len(idx), 100.0)
+    v[-181], v[-91], v[-31], v[-1] = 170.0, 140.0, 160.0, 150.0
+    close = pd.Series(v, index=idx)
+    base = dict(cfg["strategy"])
+    base["min_positive_horizons"] = 1
+    strong = dict(base, min_positive_horizons=2)
+    assert signal.exposure(close, base, 365.25 * 6).iloc[-1] > 0
+    assert signal.exposure(close, strong, 365.25 * 6).iloc[-1] == 0
+    # No hidden change to the 1-vote legacy baseline.
+    old = dict(base)
+    old.pop("min_positive_horizons")
+    np.testing.assert_allclose(signal.exposure(close, old, 365.25 * 6),
+                               signal.exposure(close, base, 365.25 * 6))
+
+
+def test_momentum_threshold_validation():
+    idx = pd.date_range("2020-01-01", periods=1600, freq="4h")
+    close = pd.Series(np.linspace(100, 200, len(idx)), index=idx)
+    for bad in (0, 4, 1.5, True):
+        try:
+            signal.exposure(close, dict(cfg["strategy"], min_positive_horizons=bad), 365.25 * 6)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError(f"Invalid min_positive_horizons accepted: {bad}")
