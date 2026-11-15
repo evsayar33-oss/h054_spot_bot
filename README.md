@@ -30,3 +30,10 @@ Bu, quant_lab'de ileri testte (walk-forward) **en kârlı** kabul edilen seçene
 - Funding geçmişi Binance verisi (Bitget için vekil). Funding negatife dönerse arbitraj az kaybettirir.
 - Sadece 2 coin; kripto genel düşüşünde H054 nakde geçer ama geçiş gecikmeli olabilir.
 - Geçmiş test canlıda aynı sonucu garanti etmez.
+
+
+## H054-MOM2 research variant (2026-11-15)
+- **Change**: original H054 entered risk-on if *any one* of 30/90/180-day momentum signals was positive. MOM2 needs **at least two positive**. The 200-day SMA gate, 40% annualized vol target, 10% trade band, BTC/ETH equal sleeves, and idle-cash funding hedge settings are unchanged.
+- **Research-only comparison, NOT verified live PnL**: on Binance BTC/ETH 4h spot OHLC, 2023-10-18 to 2026-11-13, a basic next-open, long/cash model with 15 bps assumed costs per traded spot side and no funding produced H054 +99.44% versus MOM2 +139.05%; max drawdown -23.91% versus -19.09%. In the already-viewed 2025-2026 interval: H054 -7.89% versus MOM2 +11.11%. These figures are not the bot's own futures-hedge NAV or an independent untouched holdout.
+- No automatic changes to Bitget API orders, safety registry, live mode, perp bookkeeping, or funding assumptions. PAPER remains the default. This repo retains the original quant_lab H054 fixture only for **legacy min_positive_horizons=1**; new MOM2 tests verify the majority-vote behavior independently.
+- Research continues separately in **quant_superlab**. Do not interpret a historical win as a forward profitability guarantee.
