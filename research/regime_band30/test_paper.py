@@ -3,7 +3,7 @@ import unittest
 from pathlib import Path
 import sys
 sys.path.insert(0,str(Path(__file__).parent))
-from paper import BAR, INITIAL, SYMBOLS, run, seed, tick, _repair_missing_candles
+from paper import BAR, INITIAL, SYMBOLS, run, seed, tick, _repair_missing_candles, _fresh_orderbook_quotes
 import pandas as pd
 
 
@@ -64,6 +64,28 @@ class PaperTests(unittest.TestCase):
             def fetch_ohlcv(self,*args,**kwargs): return []
         with self.assertRaisesRegex(ValueError,"UNRECOVERABLE_BITGET_GAPS"):
             _repair_missing_candles(Fake(),"BTC/USDT",df)
+
+    def test_fresh_books_without_ticker_timestamp(self):
+        class Exchange:
+            def fetch_order_book(self,sym,limit):
+                return {"bids":[[100.,2.]],"asks":[[100.1,2.]],"timestamp":1000000}
+        q=_fresh_orderbook_quotes(Exchange(),SYMBOLS,clock_ms=lambda:1001000)
+        self.assertEqual(set(q),set(SYMBOLS))
+        self.assertTrue(all(x["source"]=="bitget_spot_orderbook" for x in q.values()))
+
+    def test_missing_stale_and_crossed_book_fail_closed(self):
+        class Exchange:
+            book={}
+            def fetch_order_book(self,sym,limit):return self.book
+        e=Exchange()
+        for book in (
+            {"bids":[[100,1]],"asks":[[101,1]],"timestamp":None},
+            {"bids":[[100,1]],"asks":[[101,1]],"timestamp":100000},
+            {"bids":[[101,1]],"asks":[[100,1]],"timestamp":1000000},
+        ):
+            e.book=book
+            with self.assertRaisesRegex(ValueError,"ORDERBOOK_QUOTE"):
+                _fresh_orderbook_quotes(e,SYMBOLS,clock_ms=lambda:1001000)
 
 
 if __name__=="__main__":unittest.main()
