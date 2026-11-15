@@ -1,5 +1,8 @@
 name: H054 Strategy Regression (no orders)
 on:
+  push:
+    branches:
+      - 'research/h054-mom2-majority-20261115'
   pull_request:
     paths:
       - 'bot/signal.py'
