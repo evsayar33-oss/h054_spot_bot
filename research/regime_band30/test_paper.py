@@ -3,7 +3,8 @@ import unittest
 from pathlib import Path
 import sys
 sys.path.insert(0,str(Path(__file__).parent))
-from paper import BAR, INITIAL, SYMBOLS, run, seed, tick, _repair_missing_candles, _fresh_orderbook_quotes
+from paper import BAR, INITIAL, SYMBOLS, run, seed, tick, weights, SIGNAL_VERSION, _repair_missing_candles, _fresh_orderbook_quotes
+import numpy as np
 import pandas as pd
 
 
@@ -86,6 +87,42 @@ class PaperTests(unittest.TestCase):
             e.book=book
             with self.assertRaisesRegex(ValueError,"ORDERBOOK_QUOTE"):
                 _fresh_orderbook_quotes(e,SYMBOLS,clock_ms=lambda:1001000)
+
+    def test_corrected_band_can_enter_positions(self):
+        # BTC alone has positive regime, 90d momentum and SMA200.
+        # SOL, ETH, BNB stay below SMA200; BTC target must not be
+        # annihilated by the impossible old 30pp outer band.
+        idx=pd.date_range("2025-01-01",periods=1350,freq="4h")
+        btc=100*np.exp(np.linspace(0,0.9,len(idx)) +
+                       0.008*np.sin(np.arange(len(idx))*0.29))
+        closes=pd.DataFrame({SYMBOLS[0]:btc,
+             SYMBOLS[1]:np.linspace(300,100,len(idx)),
+             SYMBOLS[2]:np.linspace(300,100,len(idx)),
+             SYMBOLS[3]:np.linspace(300,100,len(idx))},index=idx)
+        target=weights(closes)
+        self.assertGreater(target[SYMBOLS[0]],0.0)
+        self.assertLessEqual(sum(target.values()),1.)
+
+    def test_old_unversioned_flat_state_migrates_on_new_bar(self):
+        t=200*BAR;s=seed(t)
+        tick(s,t,snap(t))
+        s.pop("signal_version")
+        s["qty"]={sym:0. for sym in SYMBOLS}
+        s["cash"]=INITIAL
+        s["trades"]=[]
+        tick(s,t+BAR,snap(t+BAR))
+        self.assertEqual(s["signal_version"],SIGNAL_VERSION)
+
+    def test_legacy_traded_ledger_is_not_silently_migrated(self):
+        t=200*BAR
+        with tempfile.TemporaryDirectory() as d:
+            path=Path(d)/"state.json"
+            s=seed(t)
+            s["trades"]=[{"asset":SYMBOLS[0]}]
+            import json
+            path.write_text(json.dumps(s))
+            with self.assertRaisesRegex(ValueError,"LEGACY_LEDGER_HAS_TRADES"):
+                run("tick",path,Path(d)/"out",now=t+BAR,snapshot_fn=snap)
 
 
 if __name__=="__main__":unittest.main()
