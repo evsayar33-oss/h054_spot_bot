@@ -13,6 +13,11 @@
       "error": "DDoSProtection",
       "message": "bitget {\"code\":\"429\",\"msg\":\"Too Many Requests\",\"requestTime\":1794771585891,\"data\":null}",
       "observed_ms": 1794771582028
+    },
+    {
+      "error": "ValueError",
+      "message": "BAD_BAR_CONTINUITY:BTC/USDT:rows=4096:first=1735689600000:last=1794744000000:gaps=[28800000, 28800000, 28800000, 28800000]",
+      "observed_ms": 1794771781175
     }
   ],
   "qty": {
