@@ -1,0 +1,173 @@
+"""Read-only Bitget 4h Regime Band-30 forward PAPER. Never calls bot.main or live."""
+from __future__ import annotations
+import argparse
+import json
+import math
+import time
+from pathlib import Path
+import numpy as np
+import pandas as pd
+
+SYMBOLS=("BTC/USDT","ETH/USDT","SOL/USDT","BNB/USDT")
+BAR=4*3600000
+SCHEMA="h054.regime_band30.bitget.paper.v1"
+COST=0.0015
+INITIAL=10000.0
+
+
+def weights(closes: pd.DataFrame) -> dict:
+    """Port of quant_superlab H116 top2_btc_regime + H117 wide_band(0.30).
+
+    Warm up with complete history so the band state is path dependent.
+    """
+    if len(closes)<1201 or closes.isna().any().any() or (closes<=0).any().any():
+        raise ValueError("INSUFFICIENT_OR_GAPPED_WARMUP")
+    returns=closes.pct_change(fill_method=None)
+    vol=returns.rolling(180,min_periods=90).std()*math.sqrt(365.25*6)
+    score=closes.pct_change(540,fill_method=None)
+    above=closes>closes.rolling(1200,min_periods=1200).mean()
+    votes=sum((closes>closes.shift(h*6)).astype(int) for h in (30,90,180))
+    valid=(vol>1e-8)&above&(votes>=2)&score.notna()
+    rank=score.where(valid).rank(axis=1,ascending=False,method="first")
+    chosen=rank<=2
+    regime=above["BTC/USDT"]&(score["BTC/USDT"]>0)
+    raw=(0.40/vol).clip(upper=1).where(chosen,0).fillna(0)/2
+    raw=raw.where(regime,0.)
+    raw=raw.clip(lower=0,upper=1)
+    # H116 banded first applies its original 10% band; H117 then applies 30%.
+    def band(data,threshold):
+        current=np.zeros(len(SYMBOLS))
+        out=[]
+        for row in data.to_numpy(dtype=float):
+            change=(np.abs(row-current)>threshold)|((row==0)&(current!=0))
+            current=np.where(change,row,current)
+            out.append(current.copy())
+        return pd.DataFrame(out,index=data.index,columns=data.columns)
+    target=band(band(raw,0.10),0.30).iloc[-1].to_dict()
+    if any(not math.isfinite(v) or v<0 for v in target.values()) or sum(target.values())>1.000001:
+        raise ValueError("INVALID_TARGET")
+    return {k:float(v) for k,v in target.items()}
+
+
+def snapshot(now_ms):
+    import ccxt
+    ex=ccxt.bitget({"enableRateLimit":True,"timeout":20000})
+    frames={}
+    quotes={}
+    anchor=int(pd.Timestamp("2025-11-01",tz="UTC").timestamp()*1000)
+    for sym in SYMBOLS:
+        cursor=anchor
+        rows=[]
+        for _ in range(100):
+            batch=ex.fetch_ohlcv(sym,"4h",since=cursor,limit=200)
+            if not batch:break
+            next_rows=[r for r in batch if int(r[0])>=cursor]
+            if not next_rows:raise ValueError("NON_PROGRESSING_SOURCE:"+sym)
+            rows.extend(next_rows)
+            cursor=int(next_rows[-1][0])+BAR
+            if cursor>now_ms-BAR:break
+        else:raise ValueError("SOURCE_PAGE_LIMIT:"+sym)
+        df=pd.DataFrame(rows,columns=["ts","o","h","l","c","v"])
+        df=df.loc[df.ts+BAR<=now_ms].copy()
+        if len(df)<1201 or df.ts.duplicated().any() or np.any(np.diff(df.ts.to_numpy())!=BAR):
+            raise ValueError("BAD_BAR_CONTINUITY:"+sym)
+        if not np.isfinite(df[["o","h","l","c","v"]].to_numpy(float)).all() or (df.c<=0).any():
+            raise ValueError("BAD_PRICES:"+sym)
+        df.index=pd.to_datetime(df.pop("ts"),unit="ms",utc=True)
+        frames[sym]=df
+        ticker=ex.fetch_ticker(sym)
+        bid,ask,stamp=ticker.get("bid"),ticker.get("ask"),ticker.get("timestamp")
+        if (not bid or not ask or not stamp or not 0<float(bid)<=float(ask)
+                or now_ms-int(stamp)>600000 or int(stamp)>now_ms+60000):
+            raise ValueError("STALE_QUOTE:"+sym)
+        quotes[sym]={"bid":float(bid),"ask":float(ask),"ts":int(stamp)}
+    if any(not frames[s].index.equals(frames[SYMBOLS[0]].index) for s in SYMBOLS):
+        raise ValueError("MISALIGNED_CANDLES")
+    last=int(frames[SYMBOLS[0]].index[-1].timestamp()*1000)
+    if now_ms-(last+BAR)>BAR*2:raise ValueError("STALE_LAST_CANDLE")
+    closes=pd.DataFrame({s:frames[s].c for s in SYMBOLS})
+    return {"candle_ms":last,"quotes":quotes,"weights":weights(closes)}
+
+
+def seed(now):
+    return {"schema":SCHEMA,"start_ms":now,"end_ms":now+90*86400000,
+            "last_candle_ms":None,"cash":INITIAL,"qty":{s:0. for s in SYMBOLS},
+            "trades":[],"ticks":[],"outages":[],"finalized":False}
+
+
+def tick(state,now,ob):
+    if state["schema"]!=SCHEMA:raise ValueError("STATE_SCHEMA")
+    if state["finalized"]:return False
+    candle=ob["candle_ms"]
+    if candle+BAR>now:raise ValueError("UNCLOSED_CANDLE")
+    if state["last_candle_ms"] is not None and candle<=state["last_candle_ms"]:
+        return False
+    quotes=ob["quotes"];target=ob["weights"]
+    if set(target)!=set(SYMBOLS) or any(v<0 or not math.isfinite(v) for v in target.values()) or sum(target.values())>1+1e-8:
+        raise ValueError("INVALID_EXPOSURE")
+    cash=float(state["cash"]);qty=dict(state["qty"]);trades=[]
+    nav=cash+sum(qty[s]*quotes[s]["bid"] for s in SYMBOLS)
+    if nav<=0:raise ValueError("NONPOSITIVE_NAV")
+    for s in SYMBOLS:
+        bid=quotes[s]["bid"]
+        current=qty[s]*bid;desired=nav*target[s]
+        if current>desired+1e-7:
+            notional=current-desired
+            qty[s]-=notional/bid
+            cash+=notional*(1-COST)
+            trades.append({"asset":s,"side":"sell","usdt":notional,"px":bid})
+    for s in SYMBOLS:
+        bid,ask=quotes[s]["bid"],quotes[s]["ask"]
+        desired=nav*target[s];current=qty[s]*bid
+        spend=min(max(0.,desired-current),cash/(1+COST))
+        if spend>1e-7:
+            qty[s]+=spend/ask
+            cash-=spend*(1+COST)
+            trades.append({"asset":s,"side":"buy","usdt":spend,"px":ask})
+    if cash< -1e-6:raise ValueError("NEGATIVE_CASH")
+    nav=cash+sum(qty[s]*quotes[s]["bid"] for s in SYMBOLS)
+    state.update(cash=cash,qty=qty,last_candle_ms=candle)
+    state["trades"].extend({"observed_ms":now,**t} for t in trades)
+    state["ticks"].append({"observed_ms":now,"candle_ms":candle,
+                            "nav":nav,"weights":target,"quotes":quotes,"trades":len(trades)})
+    if now>=state["end_ms"]:state["finalized"]=True
+    return True
+
+
+def run(mode,state_path,out,now=None,snapshot_fn=snapshot):
+    now=int(time.time()*1000) if now is None else now
+    if mode=="start":
+        if state_path.exists():raise ValueError("ALREADY_STARTED")
+        state=seed(now)
+    elif mode=="tick":
+        if not state_path.exists():return None
+        state=json.loads(state_path.read_text())
+    else:raise ValueError("INVALID_MODE")
+    if state["schema"]!=SCHEMA:raise ValueError("STATE_SCHEMA")
+    if state["finalized"]:return state
+    try:
+        tick(state,now,snapshot_fn(now))
+    except Exception as exc:
+        state["outages"].append({"observed_ms":now,"error":type(exc).__name__,
+                                 "message":str(exc)[:150]})
+    state_path.parent.mkdir(parents=True,exist_ok=True)
+    state_path.write_text(json.dumps(state,indent=2,sort_keys=True,allow_nan=False)+"\n")
+    out.mkdir(parents=True,exist_ok=True)
+    nav=state["ticks"][-1]["nav"] if state["ticks"] else INITIAL
+    summary={"schema":SCHEMA,"venue":"Bitget spot","paper_only":True,
+             "started_ms":state["start_ms"],"ends_ms":state["end_ms"],
+             "nav":nav,"return_pct":100*(nav/INITIAL-1),
+             "observations":len(state["ticks"]),"trades":len(state["trades"]),
+             "outages":len(state["outages"]),"finalized":state["finalized"]}
+    (out/"summary.json").write_text(json.dumps(summary,indent=2)+"\n")
+    print(json.dumps(summary))
+    return state
+
+
+if __name__=="__main__":
+    p=argparse.ArgumentParser()
+    p.add_argument("--mode",choices=["start","tick"],required=True)
+    p.add_argument("--state",default="results/regime_band30/state.json")
+    p.add_argument("--out",default="results/regime_band30/report")
+    a=p.parse_args()
+    run(a.mode,Path(a.state),Path(a.out))
