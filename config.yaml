@@ -12,6 +12,7 @@ strategy:                # H054 = quant_lab core rule "dual_trend_vt" + 10% no-t
   vol_target: 0.40
   vol_lookback_days: 30
   band: 0.10
+  min_positive_horizons: 2  # H054-MOM2: require 2 of 3 TSMOM horizons > 0 (legacy was >=1)
 
 idle_arb:                # long spot + short perp on the cash H054 does not use (quant_lab: accepted)
   enabled: true
