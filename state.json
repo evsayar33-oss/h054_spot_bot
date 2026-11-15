@@ -18,6 +18,11 @@
       "error": "ValueError",
       "message": "BAD_BAR_CONTINUITY:BTC/USDT:rows=4096:first=1735689600000:last=1794744000000:gaps=[28800000, 28800000, 28800000, 28800000]",
       "observed_ms": 1794771781175
+    },
+    {
+      "error": "ValueError",
+      "message": "STALE_QUOTE:SOL/USDT",
+      "observed_ms": 1794772120379
     }
   ],
   "qty": {
