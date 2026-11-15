@@ -1,0 +1,80 @@
+name: Regime Band-30 — Bitget independent PAPER
+on:
+  pull_request:
+    paths:
+      - 'research/regime_band30/**'
+      - '.github/workflows/regime_band30_paper.yml'
+  workflow_dispatch:
+    inputs:
+      mode:
+        required: true
+        type: choice
+        options: [start, tick]
+        default: start
+  schedule:
+    - cron: '25 0,4,8,12,16,20 * * *'
+permissions:
+  contents: write
+concurrency:
+  group: regime-band30-paper-state
+  cancel-in-progress: false
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install -r requirements.txt
+      - run: python -m unittest discover -s research/regime_band30 -p 'test_*.py' -v
+  paper:
+    needs: tests
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install -r requirements.txt
+      - name: Recover independent state (never touch production main)
+        run: |
+          mkdir -p results/regime_band30
+          if git ls-remote --exit-code origin refs/heads/paper/regime-band30-bitget >/dev/null 2>&1; then
+            git fetch origin refs/heads/paper/regime-band30-bitget:refs/remotes/origin/paper/regime-band30-bitget
+            git show origin/paper/regime-band30-bitget:state.json > results/regime_band30/state.json
+          fi
+      - name: Read only Bitget spot paper observation
+        env:
+          MODE: ${{ github.event_name == 'schedule' && 'tick' || inputs.mode }}
+        run: python research/regime_band30/paper.py --mode "$MODE" --state results/regime_band30/state.json --out results/regime_band30/report
+      - name: Persist isolated ledger on orphan branch
+        run: |
+          if [ ! -s results/regime_band30/state.json ]; then exit 0; fi
+          cp results/regime_band30/state.json /tmp/regime-band30-state.json
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          if git ls-remote --exit-code origin refs/heads/paper/regime-band30-bitget >/dev/null 2>&1; then
+            git checkout -B paper/regime-band30-bitget origin/paper/regime-band30-bitget
+          else
+            git checkout --orphan paper/regime-band30-bitget
+            git rm -rf . >/dev/null
+          fi
+          cp /tmp/regime-band30-state.json state.json
+          git add state.json
+          if ! git diff --cached --quiet; then
+            git commit -m 'Regime Band-30 prospective paper observation'
+            git push origin HEAD:refs/heads/paper/regime-band30-bitget
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: regime-band30-bitget-paper-${{ github.run_id }}
+          path: results/regime_band30/report/
+          retention-days: 90
+          if-no-files-found: warn
