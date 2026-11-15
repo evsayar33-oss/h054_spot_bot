@@ -4,6 +4,7 @@ import argparse
 import json
 import math
 import time
+import random
 from pathlib import Path
 import numpy as np
 import pandas as pd
@@ -49,6 +50,17 @@ def weights(closes: pd.DataFrame) -> dict:
     return {k:float(v) for k,v in target.items()}
 
 
+def _fetch_retry(fn, *args, **kwargs):
+    import ccxt
+    for attempt in range(6):
+        try:
+            return fn(*args, **kwargs)
+        except (ccxt.RateLimitExceeded, ccxt.DDoSProtection, ccxt.RequestTimeout, ccxt.NetworkError):
+            if attempt == 5:
+                raise
+            time.sleep(min(45, 3 * 2**attempt) + random.uniform(0, 1))
+
+
 def snapshot(now_ms):
     import ccxt
     ex=ccxt.bitget({"enableRateLimit":True,"timeout":20000})
@@ -59,7 +71,8 @@ def snapshot(now_ms):
         cursor=anchor
         rows=[]
         for _ in range(300):
-            batch=ex.fetch_ohlcv(sym,"4h",since=cursor,limit=200)
+            batch=_fetch_retry(ex.fetch_ohlcv,sym,"4h",since=cursor,limit=200)
+            time.sleep(0.8)
             if not batch:break
             next_rows=[r for r in batch if int(r[0])>=cursor]
             if not next_rows:raise ValueError("NON_PROGRESSING_SOURCE:"+sym)
@@ -77,7 +90,7 @@ def snapshot(now_ms):
             raise ValueError("BAD_PRICES:"+sym)
         df.index=pd.to_datetime(df.pop("ts"),unit="ms",utc=True)
         frames[sym]=df
-        ticker=ex.fetch_ticker(sym)
+        ticker=_fetch_retry(ex.fetch_ticker,sym)
         bid,ask,stamp=ticker.get("bid"),ticker.get("ask"),ticker.get("timestamp")
         if (not bid or not ask or not stamp or not 0<float(bid)<=float(ask)
                 or now_ms-int(stamp)>600000 or int(stamp)>now_ms+60000):
