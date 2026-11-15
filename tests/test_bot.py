@@ -55,8 +55,12 @@ def test_paper():
 def test_mom2_requires_two_of_three_positive_horizons():
     idx = pd.date_range("2020-01-01", periods=1600, freq="4h")
     v = np.full(len(idx), 100.0)
-    # Each horizon is measured in 4h bars, not in calendar-day observations.
-    v[-1081], v[-541], v[-181], v[-1] = 170.0, 140.0, 160.0, 150.0
+    # Derive bars with the same 365.25 convention as the production signal.
+    ppy = 365.25 * 6
+    v[-signal.bars(180, ppy)-1] = 170.0
+    v[-signal.bars(90, ppy)-1] = 140.0
+    v[-signal.bars(30, ppy)-1] = 160.0
+    v[-1] = 150.0
     close = pd.Series(v, index=idx)
     base = dict(cfg["strategy"], min_positive_horizons=1)
     strong = dict(base, min_positive_horizons=2)
