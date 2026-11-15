@@ -1,5 +1,5 @@
-"""H054 signal: exact copy of quant_lab lab/core.py (exposure "dual_trend_vt" + apply_band).
-Exposure per coin in [0, 1], decided on CLOSED bars. Do not change without changing quant_lab too."""
+"""H054 signals. Legacy min_positive_horizons=1 retains the quant_lab H054 parity fixture;
+MOM2 sets it to 2. Exposure per coin remains [0, 1], decided on CLOSED bars."""
 from __future__ import annotations
 
 import math
@@ -31,7 +31,13 @@ def exposure(close: pd.Series, cfg: dict, ppy: float) -> pd.Series:
     r = close.pct_change(fill_method=None)
     n = bars(cfg["sma_days"], ppy)
     up = (close > close.rolling(n, min_periods=n).mean()).astype(float)
-    e = up * (_tsmom(close, cfg["horizons_days"], ppy) > 0).astype(float) * _vt(r, cfg["vol_target"], cfg["vol_lookback_days"], ppy)
+    votes_required = cfg.get("min_positive_horizons", 1)
+    horizons = cfg["horizons_days"]
+    if isinstance(votes_required, bool) or not isinstance(votes_required, int) or not 1 <= votes_required <= len(horizons):
+        raise ValueError("min_positive_horizons must be an integer between 1 and the number of horizons")
+    # Majority vote for H054-MOM2; the default of 1 preserves the original H054 rule/fixture.
+    momentum_ok = sum((close > close.shift(bars(h, ppy))).astype(int) for h in horizons) >= votes_required
+    e = up * momentum_ok.astype(float) * _vt(r, cfg["vol_target"], cfg["vol_lookback_days"], ppy)
     return e.where(close.notna()).fillna(0.0).clip(0, 1)
 
 
