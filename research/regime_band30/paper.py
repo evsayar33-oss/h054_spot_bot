@@ -107,22 +107,31 @@ def _fresh_orderbook_quotes(ex, symbols, clock_ms=None):
     clock_ms=clock_ms or (lambda: int(time.time()*1000))
     result={}
     for sym in symbols:
-        started=clock_ms()
-        book=_fetch_retry(ex.fetch_order_book,sym,limit=5)
-        received=clock_ms()
-        bids,asks=book.get("bids") or [],book.get("asks") or []
-        stamp=book.get("timestamp")
-        if not bids or not asks or stamp is None:
-            raise ValueError("MISSING_ORDERBOOK_QUOTE:"+sym)
-        bid,ask=float(bids[0][0]),float(asks[0][0])
-        stamp=int(stamp)
-        if (not math.isfinite(bid) or not math.isfinite(ask)
-            or bid<=0 or ask<bid or ask/bid>1.05
-            or received<started or received-started>60000
-            or received-stamp>120000 or stamp>received+30000):
-            raise ValueError("STALE_ORDERBOOK_QUOTE:"+sym)
-        result[sym]={"bid":bid,"ask":ask,"ts":stamp,"received_ms":received,
-                     "source":"bitget_spot_orderbook"}
+        # A transient stale / missing book is not a valid fill price. Refresh
+        # the *same* exchange order book up to three times; never replace it
+        # with last candle close, another venue's price, or a synthetic quote.
+        for attempt in range(3):
+            started=clock_ms()
+            book=_fetch_retry(ex.fetch_order_book,sym,limit=5)
+            received=clock_ms()
+            bids,asks=book.get("bids") or [],book.get("asks") or []
+            stamp=book.get("timestamp")
+            reason="MISSING_ORDERBOOK_QUOTE" if not bids or not asks or stamp is None else None
+            if reason is None:
+                bid,ask=float(bids[0][0]),float(asks[0][0])
+                stamp=int(stamp)
+                if (not math.isfinite(bid) or not math.isfinite(ask)
+                    or bid<=0 or ask<bid or ask/bid>1.05
+                    or received<started or received-started>60000
+                    or received-stamp>120000 or stamp>received+30000):
+                    reason="STALE_ORDERBOOK_QUOTE"
+            if reason is None:
+                result[sym]={"bid":bid,"ask":ask,"ts":stamp,"received_ms":received,
+                             "source":"bitget_spot_orderbook"}
+                break
+            if attempt==2:
+                raise ValueError(reason+":"+sym)
+            time.sleep(1.5)
     # No artificial synchronous valuation from quotes taken minutes apart.
     if max(v["received_ms"] for v in result.values())-min(v["received_ms"] for v in result.values())>120000:
         raise ValueError("DESYNCHRONIZED_ORDERBOOKS")
@@ -139,7 +148,8 @@ def snapshot(now_ms):
         rows=[]
         for _ in range(300):
             batch=_fetch_retry(ex.fetch_ohlcv,sym,"4h",since=cursor,limit=200)
-            time.sleep(0.8)
+            # Avoid bursts across four full-history Bitget spot requests.
+            time.sleep(1.5)
             if not batch:break
             next_rows=[r for r in batch if int(r[0])>=cursor]
             if not next_rows:raise ValueError("NON_PROGRESSING_SOURCE:"+sym)
