@@ -1,4 +1,4 @@
-# h054_spot_bot — Bitget bot for quant_lab H054 (+ funding arbitrage on idle cash).
+# h054_spot_bot — Bitget bot: independent MOM2 PAPER / live default denied.
 # Everything below was decided in quant_lab (see README). Change with care.
 
 mode: paper              # paper = no real order (virtual portfolio)  |  live = real orders on Bitget
@@ -20,8 +20,7 @@ idle_arb:                # long spot + short perp on the cash H054 does not use 
   leverage: 1
 
 safety:
-  quant_lab_registry: https://raw.githubusercontent.com/evsayar33-oss/quant_lab/main/decisions/registry.json
-  hypothesis: H054
+  hypothesis: H054-MOM2
   max_registry_age_days: 10     # older -> treated as not approved
   min_trade_usdt: 6             # smaller orders are skipped (Bitget minimums ~1-8 USDT)
   max_turnover_per_run: 0.60    # never trade more than 60% of equity in one run (fat-finger guard)
