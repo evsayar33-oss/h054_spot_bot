@@ -55,9 +55,11 @@ def test_paper():
 def test_mom2_requires_two_of_three_positive_horizons():
     idx = pd.date_range("2020-01-01", periods=1600, freq="4h")
     v = np.full(len(idx), 100.0)
-    v[-541], v[-181], v[-91], v[-31], v[-1] = 170.0, 170.0, 140.0, 160.0, 150.0
+    # For 4h bars: 30d=180, 90d=540, and 180d=1080 bars.
+    v[-1081], v[-541], v[-181], v[-1] = 100.0, 170.0, 170.0, 150.0
     close = pd.Series(v, index=idx)
-    # 30d and 90d are negative while 180d is positive; this tests exactly one positive vote.
+    # Ensure the fixture itself has exactly one positive vote (180d).
+    assert [bool(close.iloc[-1] > close.iloc[-1 - n]) for n in (180, 540, 1080)] == [False, False, True]
     base = dict(cfg["strategy"], min_positive_horizons=1)
     strong = dict(base, min_positive_horizons=2)
     assert signal.exposure(close, base, 365.25 * 6).iloc[-1] > 0
