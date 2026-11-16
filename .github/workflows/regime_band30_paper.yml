@@ -28,7 +28,8 @@ jobs:
         with:
           python-version: '3.11'
       - run: pip install -r requirements.txt
-      - run: python -m unittest discover -s research/regime_band30 -p 'test_*.py' -v\n      - run: python -m unittest discover -s tests -p 'test_telegram_paper_report.py' -v
+      - run: python -m unittest discover -s research/regime_band30 -p 'test_*.py' -v
+      - run: python -m unittest discover -s tests -p 'test_telegram_paper_report.py' -v
   paper:
     needs: tests
     if: github.event_name != 'pull_request'
@@ -53,7 +54,14 @@ jobs:
         env:
           MODE: ${{ github.event_name == 'schedule' && 'tick' || inputs.mode }}
         run: python research/regime_band30/paper.py --mode "$MODE" --state results/regime_band30/state.json --out results/regime_band30/report
-      - name: Notify Telegram of new PAPER observation or outage\n        if: always() && github.event_name != 'pull_request'\n        continue-on-error: true\n        env:\n          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN || secrets.TELEGRAM_TOKEN }}\n          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID || secrets.CHAT_ID }}\n        run: python scripts/telegram_paper_report.py\n      - name: Persist isolated ledger on orphan branch
+      - name: Notify Telegram of new PAPER observation or outage
+        if: always() && github.event_name != 'pull_request'
+        continue-on-error: true
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN || secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID || secrets.CHAT_ID }}
+        run: python scripts/telegram_paper_report.py
+      - name: Persist isolated ledger on orphan branch
         run: |
           if [ ! -s results/regime_band30/state.json ]; then exit 0; fi
           cp results/regime_band30/state.json /tmp/regime-band30-state.json
