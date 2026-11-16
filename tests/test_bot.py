@@ -70,6 +70,17 @@ def test_mom2_requires_two_of_three_positive_horizons():
                                signal.exposure(close, base, 365.25 * 6))
 
 
+def test_local_safety_gate_paper_only():
+    from bot.safety import approved
+    ok, why = approved(cfg, live=False)
+    assert ok, why
+    ok, why = approved(cfg, live=True)
+    assert not ok and why == "LIVE_APPROVAL_MISSING", why
+    changed = dict(cfg, strategy=dict(cfg["strategy"], min_positive_horizons=1))
+    ok, why = approved(changed, live=False)
+    assert not ok and why == "STRATEGY_CONFIG_NOT_APPROVED", why
+
+
 def test_momentum_threshold_validation():
     idx = pd.date_range("2020-01-01", periods=1600, freq="4h")
     close = pd.Series(np.linspace(100, 200, len(idx)), index=idx)
