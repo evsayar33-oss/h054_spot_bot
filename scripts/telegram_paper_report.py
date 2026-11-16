@@ -1,11 +1,70 @@
 """Best-effort Telegram reporting for independent Regime Band-30 PAPER."""
 import json
+import socket
+import ssl
+import urllib.error
 import os
 import time
 import urllib.parse
 import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
+
+MAX_ATTEMPTS = 3
+
+
+def _safe_error_kind(exc):
+    if isinstance(exc, urllib.error.HTTPError):
+        return f"http_{exc.code}"
+    if isinstance(exc, urllib.error.URLError):
+        reason = exc.reason
+        if isinstance(reason, ssl.SSLError):
+            return "tls_error"
+        if isinstance(reason, socket.gaierror):
+            return "dns_error"
+        if isinstance(reason, (TimeoutError, socket.timeout)):
+            return "timeout"
+        if isinstance(reason, ConnectionRefusedError):
+            return "connection_refused"
+        return "network_error"
+    if isinstance(exc, (TimeoutError, socket.timeout)):
+        return "timeout"
+    return "unexpected_error"
+
+
+def send_telegram(token, chat, msg, *, opener=None, sleeper=None):
+    """Best-effort delivery. Never log token, URL, response body or chat ID."""
+    opener = opener or urllib.request.urlopen
+    sleeper = sleeper or time.sleep
+    data = urllib.parse.urlencode({"chat_id": chat, "text": msg[:4000]}).encode()
+    url = f"https://api.telegram.org/bot{token}/sendMessage"
+    for attempt in range(1, MAX_ATTEMPTS + 1):
+        try:
+            with opener(url, data, timeout=15) as response:
+                payload = json.load(response)
+            if payload.get("ok") is True:
+                print("TELEGRAM_DELIVERED")
+                return True
+            # A non-ok API response is not assumed transient; avoid duplicate sends.
+            print("TELEGRAM_DELIVERY_FAILED: api_rejected")
+            return False
+        except urllib.error.HTTPError as exc:
+            kind = _safe_error_kind(exc)
+            # 429/5xx are retryable; 400/401/403 indicate configuration/permission.
+            retryable = exc.code == 429 or 500 <= exc.code <= 599
+        except (urllib.error.URLError, TimeoutError, socket.timeout) as exc:
+            kind = _safe_error_kind(exc)
+            retryable = kind in {"dns_error", "timeout", "network_error", "connection_refused"}
+        except (ValueError, OSError) as exc:
+            kind = _safe_error_kind(exc)
+            retryable = False
+        if not retryable or attempt == MAX_ATTEMPTS:
+            print(f"TELEGRAM_DELIVERY_FAILED: {kind}; attempts={attempt}")
+            return False
+        print(f"TELEGRAM_RETRY: {kind}; attempt={attempt}")
+        sleeper(min(2 ** (attempt - 1), 4))
+    return False
+
 
 def message(state, summary, now_ms=None):
     now_ms = int(time.time() * 1000) if now_ms is None else now_ms
@@ -53,15 +112,7 @@ def main():
         return
     run_url = f"https://github.com/{os.environ.get('GITHUB_REPOSITORY', 'evsayar33-oss/h054_spot_bot')}/actions/runs/{os.environ.get('GITHUB_RUN_ID', '')}"
     msg += "\nRun: " + run_url
-    data = urllib.parse.urlencode({"chat_id": chat, "text": msg[:4000]}).encode()
-    try:
-        with urllib.request.urlopen(f"https://api.telegram.org/bot{token}/sendMessage", data, timeout=15) as response:
-            result = json.load(response)
-            if not result.get("ok"):
-                print("Telegram API returned non-ok response")
-    except Exception as exc:
-        # Do not log exception URLs: they may contain the bot token.
-        print("Telegram delivery failed:", type(exc).__name__)
+    send_telegram(token, chat, msg)
 
 if __name__ == "__main__":
     main()
