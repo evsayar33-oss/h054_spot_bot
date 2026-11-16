@@ -259,6 +259,7 @@ def run(mode,state_path,out,now=None,snapshot_fn=snapshot):
     lag_bars = max(0, (expected_candle - current_candle) // BAR) if current_candle is not None else None
     new_gaps = [g for g in state.get("continuity_gaps", []) if g["detected_ms"] == now]
     summary={"schema":SCHEMA,"venue":"Bitget spot","paper_only":True,
+             "run_ms":now,
              "last_candle_ms":current_candle,"expected_candle_ms":expected_candle,
              "lag_bars":lag_bars,"new_gap_count":sum(g["count"] for g in new_gaps),
              "total_recorded_gaps":sum(g["count"] for g in state.get("continuity_gaps", [])),

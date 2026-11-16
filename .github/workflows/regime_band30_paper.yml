@@ -13,6 +13,12 @@ on:
         default: start
   schedule:
     - cron: '25 0,4,8,12,16,20 * * *'
+  # Independent fallback: GitHub may delay or omit a scheduled run.
+  # H054 is only a clock trigger; its orders/state never enter this PAPER ledger.
+  workflow_run:
+    workflows: ['h054-bot']
+    types: [completed]
+    branches: [main]
 permissions:
   contents: write
 concurrency:
@@ -53,7 +59,7 @@ jobs:
           fi
       - name: Read only Bitget spot paper observation
         env:
-          MODE: ${{ github.event_name == 'schedule' && 'tick' || inputs.mode }}
+          MODE: ${{ github.event_name == 'workflow_dispatch' && inputs.mode || 'tick' }}
         run: python research/regime_band30/paper.py --mode "$MODE" --state results/regime_band30/state.json --out results/regime_band30/report
       - name: Notify Telegram of new PAPER observation or outage
         if: always() && github.event_name != 'pull_request'

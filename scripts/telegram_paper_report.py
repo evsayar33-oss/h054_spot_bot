@@ -72,10 +72,11 @@ def message(state, summary, now_ms=None):
     outages = state.get("outages", [])
     last_tick = ticks[-1] if ticks else None
     last_outage = outages[-1] if outages else None
-    fresh = lambda event: event and 0 <= now_ms - int(event.get("observed_ms", 0)) < 30 * 60 * 1000
+    fresh = lambda event: (event and 0 <= now_ms - int(event.get("observed_ms", 0)) < 30 * 60 * 1000
+                           and (summary.get("run_ms") is None or int(event.get("observed_ms", -1)) == int(summary["run_ms"])))
     gaps = state.get("continuity_gaps", [])
     last_gap = gaps[-1] if gaps else None
-    if last_gap and 0 <= now_ms - int(last_gap.get("detected_ms", 0)) < 30 * 60 * 1000:
+    if last_gap and 0 <= now_ms - int(last_gap.get("detected_ms", 0)) < 30 * 60 * 1000 and (summary.get("run_ms") is None or int(last_gap["detected_ms"]) == int(summary["run_ms"])):
         stamp = datetime.fromtimestamp(last_gap["first_missed_candle_ms"] / 1000, timezone.utc)
         return ("🚨 Regime Band-30 PAPER | Eksik 4h gözlemi\n"
                 f"Eksik mum: {last_gap['count']}\n"
