@@ -1,0 +1,20 @@
+{
+  "schema": "h054.local.decisions.v1",
+  "hypotheses": {
+    "H054-MOM2": {
+      "verdict": "PAPER_ACCEPT",
+      "live_verdict": "DENY",
+      "strategy": {
+        "assets": ["BTC/USDT", "ETH/USDT"],
+        "timeframe": "4h",
+        "sma_days": 200,
+        "horizons_days": [30, 90, 180],
+        "vol_target": 0.4,
+        "vol_lookback_days": 30,
+        "band": 0.1,
+        "min_positive_horizons": 2
+      },
+      "note": "Local allowlist for prospective simulation only; not a live trading approval. Explicit new live verification required."
+    }
+  }
+}
