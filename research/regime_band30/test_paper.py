@@ -46,6 +46,19 @@ class PaperTests(unittest.TestCase):
             state=run("tick",path,out,now=t+BAR,snapshot_fn=snap)
             self.assertEqual(len(state["ticks"]),1)
 
+    def test_missed_intervals_are_audited_without_backfill(self):
+        t=200*BAR
+        s=seed(t)
+        self.assertTrue(tick(s,t,snap(t)))
+        self.assertTrue(tick(s,t+3*BAR,snap(t+3*BAR)))
+        self.assertEqual(len(s["ticks"]),2)
+        self.assertEqual(len(s["trades"]),2)
+        self.assertEqual(len(s["outages"]),0)
+        self.assertEqual(s["continuity_gaps"][0]["count"],2)
+        self.assertEqual(s["continuity_gaps"][0]["first_missed_candle_ms"],t)
+        self.assertFalse(tick(s,t+3*BAR+100,snap(t+3*BAR)))
+        self.assertEqual(len(s["continuity_gaps"]),1)
+
     def test_exact_gap_recovery_only(self):
         ts=[i*BAR for i in (1,2,4,5)]
         rows=[[x,100,101,99,100,1] for x in ts]

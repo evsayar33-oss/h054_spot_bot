@@ -189,6 +189,17 @@ def tick(state,now,ob):
     if candle+BAR>now:raise ValueError("UNCLOSED_CANDLE")
     if state["last_candle_ms"] is not None and candle<=state["last_candle_ms"]:
         return False
+    previous = state["last_candle_ms"]
+    if previous is not None and candle - previous > BAR:
+        if (candle - previous) % BAR:
+            raise ValueError("UNALIGNED_OBSERVATION_GRID")
+        # This is an audit finding, not a synthetic historical trade or outage.
+        state.setdefault("continuity_gaps", []).append({
+            "detected_ms": now,
+            "first_missed_candle_ms": previous + BAR,
+            "last_missed_candle_ms": candle - BAR,
+            "count": (candle - previous) // BAR - 1,
+        })
     quotes=ob["quotes"];target=ob["weights"]
     if set(target)!=set(SYMBOLS) or any(v<0 or not math.isfinite(v) for v in target.values()) or sum(target.values())>1+1e-8:
         raise ValueError("INVALID_EXPOSURE")
@@ -243,12 +254,19 @@ def run(mode,state_path,out,now=None,snapshot_fn=snapshot):
     state_path.write_text(json.dumps(state,indent=2,sort_keys=True,allow_nan=False)+"\n")
     out.mkdir(parents=True,exist_ok=True)
     nav=state["ticks"][-1]["nav"] if state["ticks"] else INITIAL
+    current_candle = state["last_candle_ms"]
+    expected_candle = (now // BAR) * BAR - BAR
+    lag_bars = max(0, (expected_candle - current_candle) // BAR) if current_candle is not None else None
+    new_gaps = [g for g in state.get("continuity_gaps", []) if g["detected_ms"] == now]
     summary={"schema":SCHEMA,"venue":"Bitget spot","paper_only":True,
+             "last_candle_ms":current_candle,"expected_candle_ms":expected_candle,
+             "lag_bars":lag_bars,"new_gap_count":sum(g["count"] for g in new_gaps),
+             "total_recorded_gaps":sum(g["count"] for g in state.get("continuity_gaps", [])),
              "started_ms":state["start_ms"],"ends_ms":state["end_ms"],
              "nav":nav,"return_pct":100*(nav/INITIAL-1),
              "observations":len(state["ticks"]),"trades":len(state["trades"]),
              "outages":len(state["outages"]),"finalized":state["finalized"],
-             "healthy":bool(state["ticks"]) and state["ticks"][-1]["observed_ms"]==now,
+             "healthy":bool(state["ticks"]) and state["ticks"][-1]["observed_ms"]==now and lag_bars==0 and not new_gaps,
              "last_error":state["outages"][-1] if state["outages"] and (not state["ticks"] or state["outages"][-1]["observed_ms"]>=state["ticks"][-1]["observed_ms"]) else None}
     (out/"summary.json").write_text(json.dumps(summary,indent=2)+"\n")
     print(json.dumps(summary))

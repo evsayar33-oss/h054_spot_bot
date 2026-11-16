@@ -73,6 +73,14 @@ def message(state, summary, now_ms=None):
     last_tick = ticks[-1] if ticks else None
     last_outage = outages[-1] if outages else None
     fresh = lambda event: event and 0 <= now_ms - int(event.get("observed_ms", 0)) < 30 * 60 * 1000
+    gaps = state.get("continuity_gaps", [])
+    last_gap = gaps[-1] if gaps else None
+    if last_gap and 0 <= now_ms - int(last_gap.get("detected_ms", 0)) < 30 * 60 * 1000:
+        stamp = datetime.fromtimestamp(last_gap["first_missed_candle_ms"] / 1000, timezone.utc)
+        return ("🚨 Regime Band-30 PAPER | Eksik 4h gözlemi\n"
+                f"Eksik mum: {last_gap['count']}\n"
+                f"İlk eksik mum: {stamp:%Y-%m-%d %H:%M UTC}\n"
+                "Gerçek tarihsel fiyat/işlem uydurulmadı.")
     if fresh(last_outage) and (not last_tick or last_outage["observed_ms"] >= last_tick["observed_ms"]):
         # Only notify the newly recorded outage; historical outages are ignored.
         return ("🚨 Regime Band-30 PAPER | Yeni veri kesintisi\n"
