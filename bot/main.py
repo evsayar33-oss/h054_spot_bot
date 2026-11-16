@@ -86,7 +86,7 @@ def run(offline: bool = False) -> dict:
         ok, why = True, "offline test"
     else:
         from bot.safety import approved
-        ok, why = approved(cfg)
+        ok, why = approved(cfg, live=live)
 
     # 3) targets (share of capital per coin for the H054 sleeve)
     h054 = signal.targets(closes, sc, sc["timeframe"]) if ok else {c: 0.0 for c in coins}
