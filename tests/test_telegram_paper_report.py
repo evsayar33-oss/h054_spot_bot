@@ -13,6 +13,13 @@ class TelegramPaperTests(unittest.TestCase):
                  "trades": [{"observed_ms": 100000, "side": "buy", "asset": "BTC/USDT", "usdt": 50, "px": 100}]}
         result = message(state, {"observations": 1, "trades": 1, "nav": 9999, "return_pct": -.01}, now_ms=100001)
         self.assertIn("BUY BTC/USDT", result)
+    def test_new_continuity_gap_alert(self):
+        state = {"ticks": [{"observed_ms": 100000, "candle_ms": 0}], "outages": [],
+                 "continuity_gaps": [{"detected_ms": 200000, "count": 2,
+                                      "first_missed_candle_ms": 14400000}]}
+        msg = message(state, {}, now_ms=200001)
+        self.assertIn("Eksik mum: 2", msg)
+
     def test_old_outages_ignored(self):
         state = {"ticks": [{"observed_ms": 100000, "candle_ms": 0}], "outages": [{"observed_ms": 1, "error": "old"}], "trades": []}
         self.assertIn("4h mum", message(state, {"nav": 10000}, now_ms=100001))
