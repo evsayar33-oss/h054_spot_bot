@@ -20,6 +20,16 @@ class TelegramPaperTests(unittest.TestCase):
         msg = message(state, {}, now_ms=200001)
         self.assertIn("Eksik mum: 2", msg)
 
+    def test_fallback_does_not_repeat_fresh_tick(self):
+        state = {"ticks": [{"observed_ms": 100000, "candle_ms": 0}], "outages": []}
+        self.assertIsNone(message(state, {"run_ms": 200000}, now_ms=200001))
+        self.assertIn("4h mum", message(state, {"run_ms": 100000}, now_ms=100001))
+
+    def test_fallback_does_not_repeat_gap(self):
+        state = {"ticks": [], "outages": [], "continuity_gaps": [
+            {"detected_ms": 100000, "count": 1, "first_missed_candle_ms": 0}]}
+        self.assertIsNone(message(state, {"run_ms": 200000}, now_ms=200001))
+
     def test_old_outages_ignored(self):
         state = {"ticks": [{"observed_ms": 100000, "candle_ms": 0}], "outages": [{"observed_ms": 1, "error": "old"}], "trades": []}
         self.assertIn("4h mum", message(state, {"nav": 10000}, now_ms=100001))
