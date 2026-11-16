@@ -1,5 +1,9 @@
+import io
+import socket
 import unittest
-from scripts.telegram_paper_report import message
+import urllib.error
+from unittest.mock import patch
+from scripts.telegram_paper_report import message, send_telegram
 
 class TelegramPaperTests(unittest.TestCase):
     def test_no_new_event(self):
@@ -12,6 +16,41 @@ class TelegramPaperTests(unittest.TestCase):
     def test_old_outages_ignored(self):
         state = {"ticks": [{"observed_ms": 100000, "candle_ms": 0}], "outages": [{"observed_ms": 1, "error": "old"}], "trades": []}
         self.assertIn("4h mum", message(state, {"nav": 10000}, now_ms=100001))
+
+class TelegramDeliveryTests(unittest.TestCase):
+    def test_transient_dns_retry_then_success(self):
+        calls = []
+        def opener(url, data, timeout):
+            calls.append(url)
+            if len(calls) == 1:
+                raise urllib.error.URLError(socket.gaierror(-3, "temporary"))
+            return io.BytesIO(b'{"ok": true}')
+        with patch("builtins.print") as log:
+            self.assertTrue(send_telegram("secret", "123", "test", opener=opener, sleeper=lambda _: None))
+        self.assertEqual(len(calls), 2)
+        self.assertNotIn("secret", str(log.call_args_list))
+
+    def test_permanent_unauthorized_no_retry(self):
+        calls = []
+        def opener(url, data, timeout):
+            calls.append(1)
+            raise urllib.error.HTTPError(url, 401, "unauthorized", {}, None)
+        with patch("builtins.print") as log:
+            self.assertFalse(send_telegram("secret", "123", "test", opener=opener, sleeper=lambda _: None))
+        self.assertEqual(len(calls), 1)
+        self.assertIn("http_401", str(log.call_args_list))
+        self.assertNotIn("secret", str(log.call_args_list))
+
+    def test_timeout_exhausted(self):
+        calls = []
+        def opener(url, data, timeout):
+            calls.append(1)
+            raise urllib.error.URLError(socket.timeout())
+        with patch("builtins.print") as log:
+            self.assertFalse(send_telegram("secret", "123", "test", opener=opener, sleeper=lambda _: None))
+        self.assertEqual(len(calls), 3)
+        self.assertIn("timeout", str(log.call_args_list))
+
 
 if __name__ == "__main__":
     unittest.main()
