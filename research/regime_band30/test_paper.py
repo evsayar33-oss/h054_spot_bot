@@ -73,6 +73,37 @@ class PaperTests(unittest.TestCase):
         self.assertEqual(set(q),set(SYMBOLS))
         self.assertTrue(all(x["source"]=="bitget_spot_orderbook" for x in q.values()))
 
+    def test_transient_stale_book_recovered_from_same_venue(self):
+        from unittest.mock import patch
+        class Exchange:
+            calls=0
+            def fetch_order_book(self,sym,limit):
+                self.calls+=1
+                if self.calls==1:
+                    return {"bids":[[100.,2.]],"asks":[[100.1,2.]],"timestamp":1}
+                return {"bids":[[100.,2.]],"asks":[[100.1,2.]],"timestamp":1000000}
+        ex=Exchange()
+        with patch("paper.time.sleep") as delay:
+            quotes=_fresh_orderbook_quotes(ex,SYMBOLS,clock_ms=lambda:1001000)
+        self.assertEqual(ex.calls,len(SYMBOLS)+1)
+        self.assertEqual(quotes[SYMBOLS[0]]["ts"],1000000)
+        self.assertEqual(quotes[SYMBOLS[0]]["source"],"bitget_spot_orderbook")
+        delay.assert_called_once_with(1.5)
+
+    def test_repeated_stale_books_never_allow_a_paper_fill(self):
+        from unittest.mock import patch
+        class Exchange:
+            calls=0
+            def fetch_order_book(self,sym,limit):
+                self.calls+=1
+                return {"bids":[[100.,2.]],"asks":[[100.1,2.]],"timestamp":1}
+        ex=Exchange()
+        with patch("paper.time.sleep") as delay:
+            with self.assertRaisesRegex(ValueError,"STALE_ORDERBOOK_QUOTE"):
+                _fresh_orderbook_quotes(ex,SYMBOLS,clock_ms=lambda:1001000)
+        self.assertEqual(ex.calls,3)
+        self.assertEqual(delay.call_count,2)
+
     def test_missing_stale_and_crossed_book_fail_closed(self):
         class Exchange:
             book={}
