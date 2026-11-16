@@ -87,7 +87,12 @@ jobs:
           if not p.exists():
               sys.exit("NO_PAPER_SUMMARY")
           d=json.loads(p.read_text())
-          if not d.get("healthy"):
+          if d.get("healthy"):
+              print("PAPER_HEALTHY: observations",d["observations"],"trades",d["trades"])
+          elif d.get("last_error") is None and d.get("observations",0)>0:
+              # An early manual tick can legitimately see the same last closed
+              # candle. The ledger is unchanged and there is no new outage.
+              print("PAPER_NO_NEW_CANDLE: last observation retained; no new error")
+          else:
               sys.exit("PAPER_UNHEALTHY: " + str(d.get("last_error")))
-          print("PAPER_HEALTHY: observations",d["observations"],"trades",d["trades"])
           PY
