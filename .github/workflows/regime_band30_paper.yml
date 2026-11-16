@@ -95,6 +95,10 @@ jobs:
           if not p.exists():
               sys.exit("NO_PAPER_SUMMARY")
           d=json.loads(p.read_text())
+          if d.get("new_gap_count", 0) > 0:
+              sys.exit("PAPER_MISSED_OBSERVATIONS: " + str(d["new_gap_count"]))
+          if d.get("lag_bars") is None or d["lag_bars"] > 0:
+              sys.exit("PAPER_STALE_CANDLE: " + str(d.get("lag_bars")))
           if d.get("healthy"):
               print("PAPER_HEALTHY: observations",d["observations"],"trades",d["trades"])
           elif d.get("last_error") is None and d.get("observations",0)>0:
