@@ -13,6 +13,9 @@ on:
         default: start
   schedule:
     - cron: '25 0,4,8,12,16,20 * * *'
+    # Two delayed-schedule retries; tick() deduplicates candles without backfilling trades.
+    - cron: '25 1,5,9,13,17,21 * * *'
+    - cron: '25 2,6,10,14,18,22 * * *'
   # Independent fallback: GitHub may delay or omit a scheduled run.
   # H054 is only a clock trigger; its orders/state never enter this PAPER ledger.
   workflow_run:
