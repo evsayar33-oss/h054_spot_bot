@@ -11,7 +11,10 @@ on:
         type: choice
         options: [start, tick]
         default: start
-  # Hourly checks reduce the risk of missing a 4h close when GitHub delays cron.\n  # tick() deduplicates already processed candles; no synthetic PAPER fills.\n  schedule:\n    - cron: '25 * * * *'
+  # Hourly checks reduce the risk of missing a 4h close when GitHub delays cron.
+  # tick() deduplicates already processed candles; no synthetic PAPER fills.
+  schedule:
+    - cron: '25 * * * *'
   # Independent fallback: GitHub may delay or omit a scheduled run.
   # H054 is only a clock trigger; its orders/state never enter this PAPER ledger.
   workflow_run:
