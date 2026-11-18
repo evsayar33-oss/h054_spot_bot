@@ -11,10 +11,11 @@ on:
         type: choice
         options: [start, tick]
         default: start
-  # Hourly checks reduce the risk of missing a 4h close when GitHub delays cron.
-  # tick() deduplicates already processed candles; no synthetic PAPER fills.
+  # Staggered independent cron opportunities: GitHub schedule is best-effort.
+  # More chances to observe a closed 4h candle without replaying old fills.
+  # tick() is idempotent for an already processed candle.
   schedule:
-    - cron: '25 * * * *'
+    - cron: '5,25,45 * * * *'
   # Independent fallback: GitHub may delay or omit a scheduled run.
   # H054 is only a clock trigger; its orders/state never enter this PAPER ledger.
   workflow_run:
@@ -59,6 +60,8 @@ jobs:
             git fetch origin refs/heads/paper/regime-band30-bitget:refs/remotes/origin/paper/regime-band30-bitget
             git show origin/paper/regime-band30-bitget:state.json > results/regime_band30/state.json
           fi
+      # Never silently initialize a fresh PAPER ledger if the persisted branch
+      # becomes unavailable: the tick mode will not reset existing history.
       - name: Read only Bitget spot paper observation
         env:
           MODE: ${{ github.event_name == 'workflow_dispatch' && inputs.mode || 'tick' }}
