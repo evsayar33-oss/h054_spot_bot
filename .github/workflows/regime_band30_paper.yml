@@ -4,6 +4,9 @@ on:
     paths:
       - 'research/regime_band30/**'
       - '.github/workflows/regime_band30_paper.yml'
+  # Triggered by an independent Cloudflare Worker clock (separate from GitHub cron).
+  repository_dispatch:
+    types: [regime-band30-external-tick]
   workflow_dispatch:
     inputs:
       mode:

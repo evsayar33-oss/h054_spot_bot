@@ -1,0 +1,6 @@
+name = "regime-band30-independent-clock"
+main = "src/index.js"
+compatibility_date = "2026-11-01"
+# UTC: three independent attempts/hour, offset from GitHub's 05/25/45 cron.
+[triggers]
+crons = ["10,30,50 * * * *"]
