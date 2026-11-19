@@ -18,11 +18,17 @@
       "detected_ms": 1795049166794,
       "first_missed_candle_ms": 1795017600000,
       "last_missed_candle_ms": 1795017600000
+    },
+    {
+      "count": 1,
+      "detected_ms": 1795075226747,
+      "first_missed_candle_ms": 1795046400000,
+      "last_missed_candle_ms": 1795046400000
     }
   ],
   "end_ms": 1802547247202,
   "finalized": false,
-  "last_candle_ms": 1795032000000,
+  "last_candle_ms": 1795060800000,
   "outages": [
     {
       "error": "ValueError",
@@ -758,6 +764,48 @@
           "received_ms": 1795049314473,
           "source": "bitget_spot_orderbook",
           "ts": 1795049314420
+        }
+      },
+      "trades": 0,
+      "weights": {
+        "BNB/USDT": 0.0,
+        "BTC/USDT": 0.0,
+        "ETH/USDT": 0.0,
+        "SOL/USDT": 0.0
+      }
+    },
+    {
+      "candle_ms": 1795060800000,
+      "nav": 10000.0,
+      "observed_ms": 1795075226747,
+      "quotes": {
+        "BNB/USDT": {
+          "ask": 589.76,
+          "bid": 589.75,
+          "received_ms": 1795075380080,
+          "source": "bitget_spot_orderbook",
+          "ts": 1795075379985
+        },
+        "BTC/USDT": {
+          "ask": 63707.3,
+          "bid": 63707.29,
+          "received_ms": 1795075379518,
+          "source": "bitget_spot_orderbook",
+          "ts": 1795075378518
+        },
+        "ETH/USDT": {
+          "ask": 1805.61,
+          "bid": 1805.6,
+          "received_ms": 1795075379686,
+          "source": "bitget_spot_orderbook",
+          "ts": 1795075379604
+        },
+        "SOL/USDT": {
+          "ask": 74.9,
+          "bid": 74.89,
+          "received_ms": 1795075379866,
+          "source": "bitget_spot_orderbook",
+          "ts": 1795075379779
         }
       },
       "trades": 0,
