@@ -41,7 +41,8 @@ jobs:
       - run: python tests/test_bot.py
       - run: python -m unittest discover -s tests -p 'test_telegram_paper_report.py' -v
   paper:
-    needs: tests
+    # PAPER sampling must not wait for the full test suite on each cron tick.
+    # Tests remain mandatory as a separate PR validation job.
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 30
