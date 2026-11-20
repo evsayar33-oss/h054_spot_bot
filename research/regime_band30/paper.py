@@ -126,8 +126,25 @@ def _fresh_orderbook_quotes(ex, symbols, clock_ms=None):
                     or received-stamp>120000 or stamp>received+30000):
                     reason="STALE_ORDERBOOK_QUOTE"
             if reason is None:
-                result[sym]={"bid":bid,"ask":ask,"ts":stamp,"received_ms":received,
-                             "source":"bitget_spot_orderbook"}
+                # Archive observed quote sizes as evidence for FUTURE
+                # capacity checks. Never backfill historical books, infer
+                # an actual fill, or change the existing PAPER fill price.
+                quote={"bid":bid,"ask":ask,"ts":stamp,"received_ms":received,
+                       "source":"bitget_spot_orderbook"}
+                try:
+                    bid_qty=float(bids[0][1])
+                    ask_qty=float(asks[0][1])
+                    if (math.isfinite(bid_qty) and bid_qty>0
+                            and math.isfinite(ask_qty) and ask_qty>0):
+                        quote["bid_size"]=bid_qty
+                        quote["ask_size"]=ask_qty
+                        quote["top_bid_notional_usdt"]=round(bid*bid_qty,6)
+                        quote["top_ask_notional_usdt"]=round(ask*ask_qty,6)
+                except (IndexError,TypeError,ValueError,OverflowError):
+                    # Missing size must remain UNKNOWN rather than setting
+                    # zero liquidity or invalidating an otherwise real quote.
+                    pass
+                result[sym]=quote
                 break
             if attempt==2:
                 raise ValueError(reason+":"+sym)
