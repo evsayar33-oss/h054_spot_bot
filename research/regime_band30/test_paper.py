@@ -85,6 +85,19 @@ class PaperTests(unittest.TestCase):
         q=_fresh_orderbook_quotes(Exchange(),SYMBOLS,clock_ms=lambda:1001000)
         self.assertEqual(set(q),set(SYMBOLS))
         self.assertTrue(all(x["source"]=="bitget_spot_orderbook" for x in q.values()))
+        # Top-of-book size is observed data, not hypothetical execution.
+        self.assertTrue(all(x["bid_size"]==2. for x in q.values()))
+        self.assertTrue(all(x["ask_size"]==2. for x in q.values()))
+        self.assertTrue(all(x["top_bid_notional_usdt"]==200. for x in q.values()))
+        self.assertTrue(all(x["top_ask_notional_usdt"]==200.2 for x in q.values()))
+
+    def test_missing_book_sizes_are_unknown_not_fabricated_or_trade_blocked(self):
+        class Exchange:
+            def fetch_order_book(self,sym,limit):
+                return {"bids":[[100.]],"asks":[[100.2]],"timestamp":1000000}
+        q=_fresh_orderbook_quotes(Exchange(),SYMBOLS,clock_ms=lambda:1001000)
+        self.assertTrue(all("bid_size" not in x and "ask_size" not in x for x in q.values()))
+        self.assertTrue(all(x["bid"]==100. and x["ask"]==100.2 for x in q.values()))
 
     def test_transient_stale_book_recovered_from_same_venue(self):
         from unittest.mock import patch
