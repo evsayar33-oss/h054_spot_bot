@@ -28,7 +28,7 @@
   ],
   "end_ms": 1802547247202,
   "finalized": false,
-  "last_candle_ms": 1795176000000,
+  "last_candle_ms": 1795190400000,
   "outages": [
     {
       "error": "ValueError",
@@ -1174,6 +1174,64 @@
           "top_ask_notional_usdt": 1797.95361,
           "top_bid_notional_usdt": 4471.377061,
           "ts": 1795191219183
+        }
+      },
+      "trades": 0,
+      "weights": {
+        "BNB/USDT": 0.0,
+        "BTC/USDT": 0.0,
+        "ETH/USDT": 0.0,
+        "SOL/USDT": 0.0
+      }
+    },
+    {
+      "candle_ms": 1795190400000,
+      "nav": 10000.0,
+      "observed_ms": 1795205453744,
+      "quotes": {
+        "BNB/USDT": {
+          "ask": 536.42,
+          "ask_size": 0.0492,
+          "bid": 536.41,
+          "bid_size": 0.7174,
+          "received_ms": 1795205599656,
+          "source": "bitget_spot_orderbook",
+          "top_ask_notional_usdt": 26.391864,
+          "top_bid_notional_usdt": 384.820534,
+          "ts": 1795205599523
+        },
+        "BTC/USDT": {
+          "ask": 58529.69,
+          "ask_size": 0.032226,
+          "bid": 58529.68,
+          "bid_size": 0.138909,
+          "received_ms": 1795205599320,
+          "source": "bitget_spot_orderbook",
+          "top_ask_notional_usdt": 1886.17779,
+          "top_bid_notional_usdt": 8130.299319,
+          "ts": 1795205599257
+        },
+        "ETH/USDT": {
+          "ask": 1611.12,
+          "ask_size": 25.7458,
+          "bid": 1611.11,
+          "bid_size": 20.3912,
+          "received_ms": 1795205599426,
+          "source": "bitget_spot_orderbook",
+          "top_ask_notional_usdt": 41479.573296,
+          "top_bid_notional_usdt": 32852.466232,
+          "ts": 1795205598492
+        },
+        "SOL/USDT": {
+          "ask": 68.31,
+          "ask_size": 33.2574,
+          "bid": 68.3,
+          "bid_size": 75.652,
+          "received_ms": 1795205599536,
+          "source": "bitget_spot_orderbook",
+          "top_ask_notional_usdt": 2271.812994,
+          "top_bid_notional_usdt": 5167.0316,
+          "ts": 1795205599483
         }
       },
       "trades": 0,
