@@ -13,6 +13,17 @@ class TelegramPaperTests(unittest.TestCase):
                  "trades": [{"observed_ms": 100000, "side": "buy", "asset": "BTC/USDT", "usdt": 50, "px": 100}]}
         result = message(state, {"observations": 1, "trades": 1, "nav": 9999, "return_pct": -.01}, now_ms=100001)
         self.assertIn("BUY BTC/USDT", result)
+    def test_reason_for_no_trade_not_resent_on_fallback(self):
+        state = {"ticks": [{
+            "observed_ms": 100000, "candle_ms": 0,
+            "decision_trace": {"reason": "BTC_REGIME_OFF"},
+        }], "outages": [], "trades": []}
+        summary = {"run_ms": 100000, "observations": 1, "trades": 0,
+                   "nav": 10000, "return_pct": 0}
+        message_text = message(state, summary, now_ms=100001)
+        self.assertIn("BTC rejimi kapalı", message_text)
+        self.assertIsNone(message(state, {"run_ms": 200000}, now_ms=200001))
+
     def test_new_continuity_gap_alert(self):
         state = {"ticks": [{"observed_ms": 100000, "candle_ms": 0}], "outages": [],
                  "continuity_gaps": [{"detected_ms": 200000, "count": 2,

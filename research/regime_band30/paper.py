@@ -189,8 +189,20 @@ def snapshot(now_ms):
     if now_ms-(last+BAR)>BAR*2:raise ValueError("STALE_LAST_CANDLE")
     closes=pd.DataFrame({s:frames[s].c for s in SYMBOLS})
     target=weights(closes)
+    # Diagnostics use the same closed candles, never change weights or fills.
+    # Diagnostics failure is visible, but never blocks a genuine PAPER tick.
+    try:
+        from diagnostics import explain
+        decision_trace=explain(closes,target)
+        if not decision_trace["actual_signal_parity"]:
+            print("SIGNAL_TRACE_MISMATCH: independent decision reconstruction disagrees")
+    except Exception as exc:
+        decision_trace={"version":1,"signal_only":True,"reason":"TRACE_UNAVAILABLE",
+                        "error_type":type(exc).__name__}
+        print("SIGNAL_TRACE_UNAVAILABLE: "+type(exc).__name__)
     quotes=_fresh_orderbook_quotes(ex,SYMBOLS)
-    return {"candle_ms":last,"quotes":quotes,"weights":target}
+    return {"candle_ms":last,"quotes":quotes,"weights":target,
+            "decision_trace":decision_trace}
 
 
 def seed(now):
@@ -243,8 +255,12 @@ def tick(state,now,ob):
     nav=cash+sum(qty[s]*quotes[s]["bid"] for s in SYMBOLS)
     state.update(cash=cash,qty=qty,last_candle_ms=candle)
     state["trades"].extend({"observed_ms":now,**t} for t in trades)
-    state["ticks"].append({"observed_ms":now,"candle_ms":candle,
-                            "nav":nav,"weights":target,"quotes":quotes,"trades":len(trades)})
+    observed_tick={"observed_ms":now,"candle_ms":candle,
+                   "nav":nav,"weights":target,"quotes":quotes,"trades":len(trades)}
+    if isinstance(ob.get("decision_trace"),dict):
+        # Prospective append-only metadata, never rewritten for earlier ticks.
+        observed_tick["decision_trace"]=ob["decision_trace"]
+    state["ticks"].append(observed_tick)
     if now>=state["end_ms"]:state["finalized"]=True
     return True
 
@@ -282,6 +298,8 @@ def run(mode,state_path,out,now=None,snapshot_fn=snapshot):
              "total_recorded_gaps":sum(g["count"] for g in state.get("continuity_gaps", [])),
              "started_ms":state["start_ms"],"ends_ms":state["end_ms"],
              "nav":nav,"return_pct":100*(nav/INITIAL-1),
+             "decision_trace":(state["ticks"][-1].get("decision_trace")
+                               if state["ticks"] else None),
              "observations":len(state["ticks"]),"trades":len(state["trades"]),
              "outages":len(state["outages"]),"finalized":state["finalized"],
              "healthy":bool(state["ticks"]) and state["ticks"][-1]["observed_ms"]==now and lag_bars==0 and not new_gaps,

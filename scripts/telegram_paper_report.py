@@ -96,6 +96,20 @@ def message(state, summary, now_ms=None):
              f"Sanal NAV: {float(summary.get('nav', 0)):,.2f} USDT",
              f"Başlangıçtan getiri: {float(summary.get('return_pct', 0)):+.2f}%",
              f"Yeni sanal işlem: {len(new_trades)}"]
+    # Show the reason for remaining in cash on each genuinely new candle;
+    # existing message dedup and delivery behavior remain unchanged.
+    trace = last_tick.get("decision_trace") or {}
+    reasons = {
+        "BTC_REGIME_OFF": "BTC rejimi kapalı (200g ortalama / 90g momentum)",
+        "NO_ELIGIBLE_ASSETS": "Uygun varlık bulunamadı",
+        "NO_POSITIVE_RAW_TARGET": "Pozitif ham hedef yok",
+        "H116_BAND_10_BLOCKED": "İlk %10 bant yeni girişi engelledi",
+        "H117_BAND_30_BLOCKED": "İkinci %30 bant yeni girişi engelledi",
+        "TRACE_MISMATCH": "Sinyal teşhis uyuşmazlığı; doğrulama gerekli",
+        "TRACE_UNAVAILABLE": "Sinyal teşhisi bu mumda üretilemedi",
+    }
+    if not new_trades and trace.get("reason") in reasons:
+        lines.append("Karar nedeni: " + reasons[trace["reason"]])
     for trade in new_trades[:12]:
         lines.append(f"{trade['side'].upper()} {trade['asset']} | {float(trade['usdt']):.2f} USDT @ {float(trade['px']):.6g}")
     if len(new_trades) > 12:
