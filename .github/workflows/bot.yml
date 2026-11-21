@@ -1,5 +1,9 @@
 name: h054-bot
 on:
+  # Resilient fallback from Band-30's independent external clock.
+  # Never subscribe to workflow_run here: Band-30 already listens to h054-bot.
+  repository_dispatch:
+    types: [h054-mom2-fallback-tick]
   schedule:
     - cron: '11 0,4,8,12,16,20 * * *'
     # Two independent delayed-schedule retries per 4h close; duplicate bars are idempotent.

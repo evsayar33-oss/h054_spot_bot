@@ -31,6 +31,24 @@ concurrency:
   group: regime-band30-paper-state
   cancel-in-progress: false
 jobs:
+  h054_external_clock_bridge:
+    # Only the INDEPENDENT Cloudflare external tick may dispatch H054.
+    # In particular, NEVER dispatch on workflow_run (which Band-30 receives
+    # after H054 completes), or mutual workflow-trigger loops would result.
+    if: github.event_name == 'repository_dispatch' && github.event.action == 'regime-band30-external-tick' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check MOM2 closed-4h candle without changing any book
+        id: gate
+        run: python scripts/h054_dispatch_gate.py --state state/state.json --github-output "$GITHUB_OUTPUT"
+      - name: Trigger H054's existing idempotent PAPER bot only when stale
+        if: steps.gate.outputs.should_dispatch == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api -X POST "repos/$GITHUB_REPOSITORY/dispatches" -f event_type=h054-mom2-fallback-tick
   tests:
     runs-on: ubuntu-latest
     timeout-minutes: 12
@@ -42,6 +60,7 @@ jobs:
       - run: pip install -r requirements.txt
       - run: python -m unittest discover -s research/regime_band30 -p 'test_*.py' -v
       - run: python tests/test_bot.py
+      - run: python -m unittest discover -s tests -p 'test_h054_dispatch_gate.py' -v
       - run: python -m unittest discover -s tests -p 'test_telegram_paper_report.py' -v
   paper:
     # PAPER sampling must not wait for the full test suite on each cron tick.
