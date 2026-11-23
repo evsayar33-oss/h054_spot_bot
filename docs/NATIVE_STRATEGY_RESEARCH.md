@@ -17,7 +17,7 @@ zincirinde tutulur. Günlük cron ve manuel Actions çalıştırması ayrıca
 JSON/Markdown raporu ve yalnız tasarım amaçlı hipotez kuyruğu üretir.
 
 Kullanılan araştırma motoru: `evsayar33-oss/quant_superlab` pinned
-`811c04aeca2f2634bfe0f3d07be9c4b8bf480090`.
+`b5ca02a12d58730ac29b84badef8601b898540fe`.
 Bu kod yalnız çalıştıran repo içinde çalışır; diğer repoya veri göndermez.
 
 Özgün mantığı bozmamak için kombinasyonlar yalnız bu repo için
