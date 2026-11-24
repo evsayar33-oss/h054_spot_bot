@@ -40,6 +40,9 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
+      - name: Start bounded resource telemetry
+        continue-on-error: true
+        run: python3 scripts/resource_probe.py start
       - name: Check MOM2 closed-4h candle without changing any book
         id: gate
         run: python scripts/h054_dispatch_gate.py --state state/state.json --github-output "$GITHUB_OUTPUT"
@@ -49,11 +52,20 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh api -X POST "repos/$GITHUB_REPOSITORY/dispatches" -f event_type=h054-mom2-fallback-tick
+      - name: Report runner capacity
+        if: always()
+        continue-on-error: true
+        run: |
+          probe="$RUNNER_TEMP/repo-resource-$GITHUB_RUN_ID-$GITHUB_JOB/probe.py"
+          if test -f "$probe"; then python3 "$probe" finish; else echo "::warning::Resource telemetry unavailable"; fi
   tests:
     runs-on: ubuntu-latest
     timeout-minutes: 12
     steps:
       - uses: actions/checkout@v4
+      - name: Start bounded resource telemetry
+        continue-on-error: true
+        run: python3 scripts/resource_probe.py start
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
@@ -62,6 +74,12 @@ jobs:
       - run: python tests/test_bot.py
       - run: python -m unittest discover -s tests -p 'test_h054_dispatch_gate.py' -v
       - run: python -m unittest discover -s tests -p 'test_telegram_paper_report.py' -v
+      - name: Report runner capacity
+        if: always()
+        continue-on-error: true
+        run: |
+          probe="$RUNNER_TEMP/repo-resource-$GITHUB_RUN_ID-$GITHUB_JOB/probe.py"
+          if test -f "$probe"; then python3 "$probe" finish; else echo "::warning::Resource telemetry unavailable"; fi
   paper:
     # PAPER sampling must not wait for the full test suite on each cron tick.
     # Tests remain mandatory as a separate PR validation job.
@@ -72,6 +90,9 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: true
+      - name: Start bounded resource telemetry
+        continue-on-error: true
+        run: python3 scripts/resource_probe.py start
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
@@ -143,3 +164,9 @@ jobs:
           else:
               sys.exit("PAPER_UNHEALTHY: " + str(d.get("last_error")))
           PY
+      - name: Report runner capacity
+        if: always()
+        continue-on-error: true
+        run: |
+          probe="$RUNNER_TEMP/repo-resource-$GITHUB_RUN_ID-$GITHUB_JOB/probe.py"
+          if test -f "$probe"; then python3 "$probe" finish; else echo "::warning::Resource telemetry unavailable"; fi
