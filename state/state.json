@@ -1,10 +1,10 @@
 {
  "summary_day": "2026-11-24",
- "last_bar": "2026-11-24 16:00:00",
+ "last_bar": "2026-11-24 20:00:00",
  "approved": true,
  "why": "H054-MOM2 local PAPER_ACCEPT (simulation only)",
- "equity": 976.32,
- "updated_at": "2026-11-24T20:11:15+00:00",
+ "equity": 976.17,
+ "updated_at": "2026-11-25T00:13:01+00:00",
  "targets": {
   "BTC/USDT": 0.0,
   "ETH/USDT": 0.0
