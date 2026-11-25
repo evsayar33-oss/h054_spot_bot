@@ -28,7 +28,7 @@
   ],
   "end_ms": 1802547247202,
   "finalized": false,
-  "last_candle_ms": 1795564800000,
+  "last_candle_ms": 1795579200000,
   "outages": [
     {
       "error": "ValueError",
@@ -4465,6 +4465,139 @@
           "top_ask_notional_usdt": 5853.02157,
           "top_bid_notional_usdt": 2815.16697,
           "ts": 1795580001094
+        }
+      },
+      "trades": 0,
+      "weights": {
+        "BNB/USDT": 0.0,
+        "BTC/USDT": 0.0,
+        "ETH/USDT": 0.0,
+        "SOL/USDT": 0.0
+      }
+    },
+    {
+      "candle_ms": 1795579200000,
+      "decision_trace": {
+        "actual_signal_parity": true,
+        "assets": {
+          "BNB/USDT": {
+            "above_sma200": false,
+            "after_10pp_weight": 0.0,
+            "annualized_vol": 0.5613244887418845,
+            "close": 539.22,
+            "eligible": false,
+            "final_30pp_weight": 0.0,
+            "momentum_votes": 0,
+            "preband_weight": 0.0,
+            "ret_90d": -0.23785159010600698,
+            "top_two": false
+          },
+          "BTC/USDT": {
+            "above_sma200": false,
+            "after_10pp_weight": 0.0,
+            "annualized_vol": 0.5201506262659227,
+            "close": 58744.0,
+            "eligible": false,
+            "final_30pp_weight": 0.0,
+            "momentum_votes": 0,
+            "preband_weight": 0.0,
+            "ret_90d": -0.2571979809400927,
+            "top_two": false
+          },
+          "ETH/USDT": {
+            "above_sma200": false,
+            "after_10pp_weight": 0.0,
+            "annualized_vol": 0.6620683599526063,
+            "close": 1640.9,
+            "eligible": false,
+            "final_30pp_weight": 0.0,
+            "momentum_votes": 0,
+            "preband_weight": 0.0,
+            "ret_90d": -0.34293562699213553,
+            "top_two": false
+          },
+          "SOL/USDT": {
+            "above_sma200": false,
+            "after_10pp_weight": 0.0,
+            "annualized_vol": 0.7020174601182049,
+            "close": 67.82,
+            "eligible": false,
+            "final_30pp_weight": 0.0,
+            "momentum_votes": 0,
+            "preband_weight": 0.0,
+            "ret_90d": -0.3336608370996267,
+            "top_two": false
+          }
+        },
+        "btc_above_sma200": false,
+        "btc_positive_90d": false,
+        "btc_regime_on": false,
+        "candle_ms": 1795579200000,
+        "historical_btc_regime_on_last_30_bars": 0,
+        "reason": "BTC_REGIME_OFF",
+        "shadow_alternative_signals_not_pnl": {
+          "20pp": {
+            "BNB/USDT": 0.0,
+            "BTC/USDT": 0.0,
+            "ETH/USDT": 0.0,
+            "SOL/USDT": 0.0
+          },
+          "25pp": {
+            "BNB/USDT": 0.0,
+            "BTC/USDT": 0.0,
+            "ETH/USDT": 0.0,
+            "SOL/USDT": 0.0
+          }
+        },
+        "signal_only": true,
+        "version": 1
+      },
+      "nav": 10000.0,
+      "observed_ms": 1795594259259,
+      "quotes": {
+        "BNB/USDT": {
+          "ask": 540.39,
+          "ask_size": 0.2303,
+          "bid": 540.36,
+          "bid_size": 5.5229,
+          "received_ms": 1795594410073,
+          "source": "bitget_spot_orderbook",
+          "top_ask_notional_usdt": 124.451817,
+          "top_bid_notional_usdt": 2984.354244,
+          "ts": 1795594409997
+        },
+        "BTC/USDT": {
+          "ask": 58946.62,
+          "ask_size": 0.26179,
+          "bid": 58946.61,
+          "bid_size": 0.404595,
+          "received_ms": 1795594409570,
+          "source": "bitget_spot_orderbook",
+          "top_ask_notional_usdt": 15431.63565,
+          "top_bid_notional_usdt": 23849.503673,
+          "ts": 1795594408939
+        },
+        "ETH/USDT": {
+          "ask": 1642.72,
+          "ask_size": 0.0025,
+          "bid": 1642.71,
+          "bid_size": 105.7266,
+          "received_ms": 1795594409746,
+          "source": "bitget_spot_orderbook",
+          "top_ask_notional_usdt": 4.1068,
+          "top_bid_notional_usdt": 173678.143086,
+          "ts": 1795594409645
+        },
+        "SOL/USDT": {
+          "ask": 67.91,
+          "ask_size": 16.005,
+          "bid": 67.9,
+          "bid_size": 40.6853,
+          "received_ms": 1795594409907,
+          "source": "bitget_spot_orderbook",
+          "top_ask_notional_usdt": 1086.89955,
+          "top_bid_notional_usdt": 2762.53187,
+          "ts": 1795594409671
         }
       },
       "trades": 0,
