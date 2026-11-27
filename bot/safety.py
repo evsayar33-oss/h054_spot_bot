@@ -5,12 +5,13 @@ import json
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+from bot.superlab_gate import live_accepted
+
 REGISTRY = Path(__file__).resolve().parent.parent / "decisions" / "registry.json"
 STRATEGY_KEYS = (
     "assets", "timeframe", "sma_days", "horizons_days",
     "vol_target", "vol_lookback_days", "band", "min_positive_horizons",
 )
-
 
 def approved(cfg: dict, *, live: bool = False) -> tuple[bool, str]:
     """Reject unreviewed rule edits and never turn PAPER permission into LIVE approval."""
@@ -38,6 +39,10 @@ def approved(cfg: dict, *, live: bool = False) -> tuple[bool, str]:
         age = datetime.now(timezone.utc) - stamp.astimezone(timezone.utc)
         if not timedelta(0) <= age <= timedelta(days=cfg["safety"].get("max_registry_age_days", 10)):
             return False, "LIVE_APPROVAL_EXPIRED_OR_FUTURE"
-        return True, "H054-MOM2 local LIVE_ACCEPT"
+        central_ok, central_reason = live_accepted(
+            max_age_days=cfg["safety"].get("max_registry_age_days", 10))
+        if not central_ok:
+            return False, central_reason
+        return True, "H054-MOM2 local LIVE_ACCEPT + " + central_reason
     except (OSError, ValueError, TypeError, KeyError) as exc:
         return False, "LOCAL_REGISTRY_UNAVAILABLE_OR_INVALID:" + type(exc).__name__
