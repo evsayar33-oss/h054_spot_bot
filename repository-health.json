@@ -1,11 +1,11 @@
 {
   "repository": "evsayar33-oss/h054_spot_bot",
-  "observed_at": "2026-11-26T17:13:06.844483+00:00",
+  "observed_at": "2026-11-27T16:55:01.016881+00:00",
   "metrics": {
-    "repository_bytes": 302080,
-    "cache_bytes": 0,
-    "artifact_bytes": 466289,
-    "artifact_count": 631,
+    "repository_bytes": 322560,
+    "cache_bytes": 117794825,
+    "artifact_bytes": 540108,
+    "artifact_count": 713,
     "release_count": 0,
     "release_asset_bytes": 0
   },
@@ -18,6 +18,7 @@
   "archive_pending": 0,
   "workflow_states": {
     ".github/workflows/bot.yml": "active",
+    ".github/workflows/core_ci.yml": "active",
     ".github/workflows/native_strategy_research.yml": "active",
     ".github/workflows/regime_band30_paper.yml": "active",
     ".github/workflows/repository_guardian.yml": "active",
